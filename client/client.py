@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 nest_asyncio.apply()
 
 # Load environment variables
-load_dotenv("../.env")
+load_dotenv("/home/human/AAREPOS/NEW BACKEND/.env")
 
 # Global variables to store session state
 session: ClientSession | None = None
@@ -32,7 +32,7 @@ async def connect_to_server(server_script_path: str = "server.py"):
 
     # Server configuration
     server_params = StdioServerParameters(
-        command="/home/human/AAAVENVS/venv/bin/python",  # Use the venv Python
+        command="/home/human/AAAVENVS/NEWBKND/bin/python",  # Use the NEWBKND Python
         args=[server_script_path],
     )
 
@@ -189,16 +189,23 @@ async def cleanup():
 
 async def main():
     """Main entry point for the client."""
-    await connect_to_server("server.py")
-
-    # Example: Ask about company vacation policy
-    query = "What is our company's vacation policy?"
-    print(f"\nQuery: {query}")
-
-    response = await process_query(query)
-    print(f"\nResponse: {response}")
-
-    await cleanup()
+    try:
+        await connect_to_server("server.py")
+        print("\nConnected to server. Enter your queries (press Ctrl+C to exit):")
+        
+        while True:
+            try:
+                query = input("\nEnter your query: ").strip()
+                if query:
+                    response = await process_query(query)
+                    print(f"\nResponse: {response}")
+            except KeyboardInterrupt:
+                print("\nExiting...")
+                break
+            except Exception as e:
+                print(f"\nError processing query: {e}")
+    finally:
+        await cleanup()
 
 
 if __name__ == "__main__":
