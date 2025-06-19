@@ -219,6 +219,8 @@ class ChatBot:
         # Handle streaming response
         full_content = ""
         tool_calls = []
+        tool_calls_dict = {}  # Use dict to properly accumulate tool calls by index
+        
         async for chunk in response:
             if not chunk.choices:
                 continue
@@ -229,85 +231,67 @@ class ChatBot:
                 full_content += delta.content
                 yield delta.content
             
-            # Handle tool calls
+            # Handle tool calls - FIXED LOGIC
             if delta.tool_calls:
-                if not tool_calls:
-                    tool_calls = delta.tool_calls
-                else:
-                    for i, tool_call in enumerate(delta.tool_calls):
-                        if i < len(tool_calls):
-                            if (
-                                tool_calls[i].function is not None and
-                                tool_call.function is not None
-                            ):
-                                arg1 = getattr(tool_calls[i].function, 'arguments', None)
-                                arg2 = getattr(tool_call.function, 'arguments', None)
-                                if (
-                                    isinstance(arg1, str) and isinstance(arg2, str) and
-                                    hasattr(tool_calls[i].function, 'arguments')
-                                ):
-                                    setattr(tool_calls[i].function, 'arguments', arg1 + arg2)
+                for delta_tool_call in delta.tool_calls:
+                    idx = delta_tool_call.index
+                    
+                    if idx not in tool_calls_dict:
+                        # Initialize new tool call
+                        tool_calls_dict[idx] = {
+                            'id': delta_tool_call.id,
+                            'type': delta_tool_call.type,
+                            'function': {
+                                'name': delta_tool_call.function.name if delta_tool_call.function and delta_tool_call.function.name else '',
+                                'arguments': delta_tool_call.function.arguments if delta_tool_call.function and delta_tool_call.function.arguments else ''
+                            }
+                        }
+                    else:
+                        # Accumulate arguments
+                        if delta_tool_call.function and delta_tool_call.function.arguments:
+                            tool_calls_dict[idx]['function']['arguments'] += delta_tool_call.function.arguments
+
+        # Convert accumulated tool calls back to list format
+        tool_calls = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
 
         # Add assistant message to history
         assistant_message = {
             "role": "assistant", 
             "content": full_content,
-            "tool_calls": [tc.model_dump() for tc in tool_calls] if tool_calls else None
+            "tool_calls": tool_calls if tool_calls else None
         }
         self.conversation_history.append(assistant_message)
 
-        # Handle tool calls if present
+        # Handle tool calls if present - SIMPLIFIED LOGIC
         if tool_calls:
+            self.logger.info(f"Received {len(tool_calls)} tool calls: {[tc['function']['name'] for tc in tool_calls]}")
             for tool_call in tool_calls:
                 try:
-                    func = getattr(tool_call, 'function', None)
-                    if func is not None:
-                        arguments_str = getattr(func, 'arguments', None)
-                        name = getattr(func, 'name', None)
-                        if arguments_str is not None and name is not None:
-                            arguments = json.loads(arguments_str)
-                            result = await self.session.call_tool(
-                                name,
-                                arguments=arguments,
-                            )
-                            content_text = self._extract_tool_content(result)
-                            # Add tool response to conversation
-                            self.conversation_history.append({
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "content": content_text,
-                            })
-                        else:
-                            error_message = "Tool call missing arguments or name."
-                            self.logger.error(error_message)
-                            self.conversation_history.append({
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "content": error_message,
-                            })
-                    else:
-                        error_message = "Tool call missing function attribute."
-                        self.logger.error(error_message)
-                        self.conversation_history.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": error_message,
-                        })
+                    arguments = json.loads(tool_call['function']['arguments'])
+                    result = await self.session.call_tool(
+                        tool_call['function']['name'],
+                        arguments=arguments,
+                    )
+                    content_text = self._extract_tool_content(result)
+                    # Add tool response to conversation
+                    self.conversation_history.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call['id'],
+                        "content": content_text,
+                    })
                 except Exception as e:
-                    func = getattr(tool_call, 'function', None)
-                    name = getattr(func, 'name', None) if func is not None else 'unknown'
-                    error_message = f"Error executing tool {name}: {str(e)}"
+                    error_message = f"Error executing tool {tool_call['function']['name']}: {str(e)}"
                     self.logger.error(error_message)
                     self.conversation_history.append({
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call['id'],
                         "content": error_message,
                     })
 
             # Get final response with streaming
             final_response = await self.openai_client.chat.completions.create(
                 model=self.config.openai_config['model'],
-                messages=messages,
+                messages=self.conversation_history,  # Use updated history with tool results
                 tools=tools_param,
                 tool_choice="none",
                 temperature=self.config.openai_config['temperature'],
