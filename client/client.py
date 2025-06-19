@@ -1,13 +1,10 @@
 import asyncio
 import json
 import logging
-import os
 from contextlib import AsyncExitStack
-from pathlib import Path
-from typing import Any, Dict, List, Optional, AsyncGenerator, Union
+from typing import Any, Dict, List, Optional, AsyncGenerator
 
 import nest_asyncio
-import yaml
 from dotenv import load_dotenv
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -19,66 +16,79 @@ nest_asyncio.apply()
 # Load environment variables
 load_dotenv("/home/human/AAREPOS/NEW BACKEND/.env")
 
-class Config:
-    """Configuration manager for the chatbot."""
+class ServerConfig:
+    """Configuration manager that gets all config from the MCP server."""
     
-    def __init__(self, config_path: str = "config.yaml"):
-        # Get the directory where client.py is located
-        client_dir = Path(__file__).parent
-        self.config_path = client_dir / config_path
-        
-        if not self.config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
-            
-        with open(self.config_path, 'r') as f:
-            self.config = yaml.safe_load(f)
-            
-        # Setup logging
-        if self.config['logging']['enabled']:
-            logging.basicConfig(
-                filename=self.config['logging']['log_file'],
-                level=getattr(logging, self.config['logging']['level'].upper()),
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-        
+    def __init__(self):
+        self.config: Dict[str, Any] = {}
         self.logger = logging.getLogger(__name__)
-        self.logger.info("Configuration loaded successfully")
+        
+        # Setup basic logging (will be updated from server config later)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+    
+    async def load_from_server(self, session):
+        """Load configuration from the MCP server."""
+        try:
+            result = await session.call_tool("get_config", arguments={})
+            content_text = self._extract_tool_content(result)
+            self.config = json.loads(content_text)
+            
+            # Update logging configuration
+            if 'logging' in self.config and self.config['logging']['enabled']:
+                log_level = getattr(logging, self.config['logging']['level'].upper())
+                logging.getLogger().setLevel(log_level)
+            
+            self.logger.info("Configuration loaded from server")
+        except Exception as e:
+            self.logger.error(f"Failed to load config from server: {e}")
+            raise
+    
+    def _extract_tool_content(self, result) -> str:
+        """Extract content from tool results."""
+        content_text = ""
+        if result.content:
+            for content_item in result.content:
+                if hasattr(content_item, 'type'):
+                    if content_item.type == 'text' and hasattr(content_item, 'text'):
+                        content_text += content_item.text
+                    else:
+                        content_text += f"[{content_item.type} content]"
+                else:
+                    content_text += str(content_item)
+        return content_text
 
     @property
     def openai_config(self) -> Dict[str, Any]:
-        return self.config['openai']
+        return self.config.get('openai', {})
     
     @property
     def server_config(self) -> Dict[str, Any]:
-        return self.config['server']
+        return self.config.get('server', {})
     
     @property
     def chatbot_config(self) -> Dict[str, Any]:
-        return self.config['chatbot']
+        return self.config.get('chatbot', {})
 
 class ChatBot:
-    def __init__(self, config: Config):
-        self.config = config
+    def __init__(self):
+        self.config = ServerConfig()
         self.logger = logging.getLogger(__name__)
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.openai_client = AsyncOpenAI()
         self.conversation_history: List[Dict[str, Any]] = []
+        self.system_message: Dict[str, Any] = {}
         
-        # Initialize system message from config
-        self.system_message = {
-            "role": "system",
-            "content": self.config.chatbot_config['system_prompt']
-        }
-        self.conversation_history.append(self.system_message)
-        
-        self.logger.info("ChatBot initialized with configuration")
+        self.logger.info("ChatBot initialized (config will be loaded from server)")
 
-    async def connect_to_server(self):
-        """Connect to an MCP server using configured parameters."""
+    async def connect_to_server(self, python_path: str = "/home/human/AAAVENVS/NEWBKND/bin/python", script_path: str = "/home/human/AAREPOS/NEW BACKEND/server.py"):
+        """Connect to an MCP server and load configuration."""
         server_params = StdioServerParameters(
-            command=self.config.server_config['python_path'],
-            args=[self.config.server_config['script_path']],
+            command=python_path,
+            args=[script_path],
         )
 
         stdio_transport = await self.exit_stack.enter_async_context(
@@ -90,6 +100,17 @@ class ChatBot:
         )
 
         await self.session.initialize()
+        
+        # Load configuration from server
+        await self.config.load_from_server(self.session)
+        
+        # Initialize system message from server config
+        self.system_message = {
+            "role": "system",
+            "content": self.config.chatbot_config.get('system_prompt', 'You are a helpful assistant.')
+        }
+        self.conversation_history.append(self.system_message)
+        
         return await self.session.list_tools()
 
     async def get_mcp_tools(self) -> List[Dict[str, Any]]:
@@ -110,8 +131,48 @@ class ChatBot:
             for tool in tools_result.tools
         ]
 
+    async def _update_system_prompt_if_changed(self):
+        """Check if system prompt has changed in server config and update if necessary."""
+        if self.session is None:
+            return
+            
+        try:
+            # Get current system prompt from server
+            result = await self.session.call_tool(
+                "get_config",
+                arguments={"section": "chatbot"}
+            )
+            
+            content_text = self._extract_tool_content(result)
+            server_config = json.loads(content_text)
+            
+            if "chatbot" in server_config:
+                new_system_prompt = server_config["chatbot"].get("system_prompt", "")
+                current_system_prompt = self.system_message.get("content", "")
+                
+                if new_system_prompt != current_system_prompt:
+                    # Reload full config from server
+                    await self.config.load_from_server(self.session)
+                    
+                    # Update system message
+                    self.system_message["content"] = new_system_prompt
+                    
+                    # Update first message in conversation history (should be system message)
+                    if self.conversation_history and self.conversation_history[0]["role"] == "system":
+                        self.conversation_history[0]["content"] = new_system_prompt
+                        self.logger.info(f"System prompt updated to: {new_system_prompt[:50]}...")
+                    else:
+                        # If somehow system message is not first, insert it
+                        self.conversation_history.insert(0, self.system_message)
+                        self.logger.info("System message added to conversation history")
+        except Exception as e:
+            self.logger.warning(f"Failed to update system prompt from server: {e}")
+
     async def process_message(self, user_message: str):
         """Process a user message maintaining conversation context."""
+        # Check if system prompt has changed and update if necessary
+        await self._update_system_prompt_if_changed()
+        
         if self.config.chatbot_config.get('stream_responses', False):
             async for chunk in self._process_message_streaming(user_message):
                 yield chunk
@@ -133,12 +194,19 @@ class ChatBot:
         self.conversation_history.append({"role": "user", "content": user_message})
         
         tools = await self.get_mcp_tools()
+        # Convert conversation_history to OpenAI message objects
+        from openai.types.chat import (
+            ChatCompletionMessageParam,
+            ChatCompletionToolParam
+        )
+        messages: List[ChatCompletionMessageParam] = self.conversation_history  # type: ignore
+        tools_param: List[ChatCompletionToolParam] = tools  # type: ignore
         
         # Get initial response with streaming
         response = await self.openai_client.chat.completions.create(
             model=self.config.openai_config['model'],
-            messages=self.conversation_history,
-            tools=tools,
+            messages=messages,
+            tools=tools_param,
             tool_choice="auto",
             temperature=self.config.openai_config['temperature'],
             top_p=self.config.openai_config['top_p'],
@@ -168,8 +236,17 @@ class ChatBot:
                 else:
                     for i, tool_call in enumerate(delta.tool_calls):
                         if i < len(tool_calls):
-                            if tool_call.function and tool_call.function.arguments:
-                                tool_calls[i].function.arguments += tool_call.function.arguments
+                            if (
+                                tool_calls[i].function is not None and
+                                tool_call.function is not None
+                            ):
+                                arg1 = getattr(tool_calls[i].function, 'arguments', None)
+                                arg2 = getattr(tool_call.function, 'arguments', None)
+                                if (
+                                    isinstance(arg1, str) and isinstance(arg2, str) and
+                                    hasattr(tool_calls[i].function, 'arguments')
+                                ):
+                                    setattr(tool_calls[i].function, 'arguments', arg1 + arg2)
 
         # Add assistant message to history
         assistant_message = {
@@ -183,22 +260,43 @@ class ChatBot:
         if tool_calls:
             for tool_call in tool_calls:
                 try:
-                    arguments = json.loads(tool_call.function.arguments)
-                    result = await self.session.call_tool(
-                        tool_call.function.name,
-                        arguments=arguments,
-                    )
-
-                    content_text = self._extract_tool_content(result)
-                    
-                    # Add tool response to conversation
-                    self.conversation_history.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": content_text,
-                    })
+                    func = getattr(tool_call, 'function', None)
+                    if func is not None:
+                        arguments_str = getattr(func, 'arguments', None)
+                        name = getattr(func, 'name', None)
+                        if arguments_str is not None and name is not None:
+                            arguments = json.loads(arguments_str)
+                            result = await self.session.call_tool(
+                                name,
+                                arguments=arguments,
+                            )
+                            content_text = self._extract_tool_content(result)
+                            # Add tool response to conversation
+                            self.conversation_history.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": content_text,
+                            })
+                        else:
+                            error_message = "Tool call missing arguments or name."
+                            self.logger.error(error_message)
+                            self.conversation_history.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": error_message,
+                            })
+                    else:
+                        error_message = "Tool call missing function attribute."
+                        self.logger.error(error_message)
+                        self.conversation_history.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": error_message,
+                        })
                 except Exception as e:
-                    error_message = f"Error executing tool {tool_call.function.name}: {str(e)}"
+                    func = getattr(tool_call, 'function', None)
+                    name = getattr(func, 'name', None) if func is not None else 'unknown'
+                    error_message = f"Error executing tool {name}: {str(e)}"
                     self.logger.error(error_message)
                     self.conversation_history.append({
                         "role": "tool",
@@ -209,8 +307,8 @@ class ChatBot:
             # Get final response with streaming
             final_response = await self.openai_client.chat.completions.create(
                 model=self.config.openai_config['model'],
-                messages=self.conversation_history,
-                tools=tools,
+                messages=messages,
+                tools=tools_param,
                 tool_choice="none",
                 temperature=self.config.openai_config['temperature'],
                 top_p=self.config.openai_config['top_p'],
@@ -247,12 +345,15 @@ class ChatBot:
         self.conversation_history.append({"role": "user", "content": user_message})
         
         tools = await self.get_mcp_tools()
+        from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
+        messages: List[ChatCompletionMessageParam] = self.conversation_history  # type: ignore
+        tools_param: List[ChatCompletionToolParam] = tools  # type: ignore
         
         # Get initial response without streaming
         response = await self.openai_client.chat.completions.create(
             model=self.config.openai_config['model'],
-            messages=self.conversation_history,
-            tools=tools,
+            messages=messages,
+            tools=tools_param,
             tool_choice="auto",
             temperature=self.config.openai_config['temperature'],
             top_p=self.config.openai_config['top_p'],
@@ -295,8 +396,8 @@ class ChatBot:
             # Get final response without streaming
             final_response = await self.openai_client.chat.completions.create(
                 model=self.config.openai_config['model'],
-                messages=self.conversation_history,
-                tools=tools,
+                messages=messages,
+                tools=tools_param,
                 tool_choice="none",
                 temperature=self.config.openai_config['temperature'],
                 top_p=self.config.openai_config['top_p'],
@@ -337,8 +438,7 @@ async def main():
     """Main entry point for the chatbot."""
     chatbot = None
     try:
-        config = Config("config.yaml")
-        chatbot = ChatBot(config)
+        chatbot = ChatBot()
         tools = await chatbot.connect_to_server()
         
         print("\nChatbot initialized with the following tools:")
@@ -353,25 +453,16 @@ async def main():
                     print("Goodbye!")
                     break
                 if user_input:
-                    if config.chatbot_config.get('stream_responses', False):
-                        print("\nAssistant: ", end="", flush=True)
-                        async for chunk in chatbot.process_message(user_input):
-                            print(chunk, end="", flush=True)
-                        print()  # New line after response
-                    else:
-                        print("\nAssistant: ", end="", flush=True)
-                        async for chunk in chatbot.process_message(user_input):
-                            print(chunk, end="", flush=True)
-                        print()  # New line after response
+                    print("\nAssistant: ", end="", flush=True)
+                    async for chunk in chatbot.process_message(user_input):
+                        print(chunk, end="", flush=True)
+                    print()  # New line after response
             except KeyboardInterrupt:
                 print("\nGoodbye!")
                 break
             except Exception as e:
                 logging.error(f"Error during chat: {str(e)}")
                 print(f"\nError: {e}")
-    except FileNotFoundError as e:
-        print(f"\nError: {e}")
-        print("Please make sure the config.yaml file exists in the client directory.")
     except Exception as e:
         print(f"\nError during initialization: {e}")
     finally:

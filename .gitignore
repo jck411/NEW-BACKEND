@@ -188,7 +188,6 @@ ehthumbs.db
 Thumbs.db
 
 # MCP Server specific
-server.py
 *.mcp
 
 # API Keys and secrets
@@ -197,7 +196,6 @@ server.py
 .env.test.local
 .env.production.local
 secrets.json
-config.json
 
 # Logs
 logs/
