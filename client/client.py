@@ -209,69 +209,81 @@ class ChatBot:
         messages: List[ChatCompletionMessageParam] = self.conversation_history  # type: ignore
         tools_param: List[ChatCompletionToolParam] = tools  # type: ignore
         
-        # Get initial response with streaming
-        response = await self.openai_client.chat.completions.create(
-            model=self.config.openai_config['model'],
-            messages=messages,
-            tools=tools_param,
-            tool_choice="auto",
-            temperature=self.config.openai_config['temperature'],
-            top_p=self.config.openai_config['top_p'],
-            max_tokens=self.config.openai_config['max_tokens'],
-            presence_penalty=self.config.openai_config['presence_penalty'],
-            frequency_penalty=self.config.openai_config['frequency_penalty'],
-            stream=True
-        )
-
-        # Handle streaming response
-        full_content = ""
-        tool_calls = []
-        tool_calls_dict = {}  # Accumulate tool calls by index
+        # Allow multiple rounds of tool calls with reasonable limit
+        max_tool_iterations = 5  # Prevent infinite loops
+        current_iteration = 0
         
-        async for chunk in response:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
+        while current_iteration < max_tool_iterations:
+            current_iteration += 1
             
-            # Handle content
-            if delta.content:
-                full_content += delta.content
-                yield delta.content
+            # Get response with streaming
+            response = await self.openai_client.chat.completions.create(
+                model=self.config.openai_config['model'],
+                messages=self.conversation_history,
+                tools=tools_param,
+                tool_choice="auto",  # Let LLM decide if tools are needed
+                temperature=self.config.openai_config['temperature'],
+                top_p=self.config.openai_config['top_p'],
+                max_tokens=self.config.openai_config['max_tokens'],
+                presence_penalty=self.config.openai_config['presence_penalty'],
+                frequency_penalty=self.config.openai_config['frequency_penalty'],
+                stream=True
+            )
+
+            # Handle streaming response
+            full_content = ""
+            tool_calls = []
+            tool_calls_dict = {}  # Accumulate tool calls by index
             
-            # Handle tool calls
-            if delta.tool_calls:
-                for delta_tool_call in delta.tool_calls:
-                    idx = delta_tool_call.index
-                    
-                    if idx not in tool_calls_dict:
-                        # Initialize new tool call
-                        tool_calls_dict[idx] = {
-                            'id': delta_tool_call.id,
-                            'type': delta_tool_call.type,
-                            'function': {
-                                'name': delta_tool_call.function.name if delta_tool_call.function and delta_tool_call.function.name else '',
-                                'arguments': delta_tool_call.function.arguments if delta_tool_call.function and delta_tool_call.function.arguments else ''
+            async for chunk in response:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                
+                # Handle content
+                if delta.content:
+                    full_content += delta.content
+                    # Only yield content if no tool calls (to avoid mixing output)
+                    if not delta.tool_calls:
+                        yield delta.content
+                
+                # Handle tool calls
+                if delta.tool_calls:
+                    for delta_tool_call in delta.tool_calls:
+                        idx = delta_tool_call.index
+                        
+                        if idx not in tool_calls_dict:
+                            # Initialize new tool call
+                            tool_calls_dict[idx] = {
+                                'id': delta_tool_call.id,
+                                'type': delta_tool_call.type,
+                                'function': {
+                                    'name': delta_tool_call.function.name if delta_tool_call.function and delta_tool_call.function.name else '',
+                                    'arguments': delta_tool_call.function.arguments if delta_tool_call.function and delta_tool_call.function.arguments else ''
+                                }
                             }
-                        }
-                    else:
-                        # Accumulate arguments
-                        if delta_tool_call.function and delta_tool_call.function.arguments:
-                            tool_calls_dict[idx]['function']['arguments'] += delta_tool_call.function.arguments
+                        else:
+                            # Accumulate arguments
+                            if delta_tool_call.function and delta_tool_call.function.arguments:
+                                tool_calls_dict[idx]['function']['arguments'] += delta_tool_call.function.arguments
 
-        # Convert accumulated tool calls back to list format
-        tool_calls = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
+            # Convert accumulated tool calls back to list format
+            tool_calls = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
 
-        # Add assistant message to history
-        assistant_message = {
-            "role": "assistant", 
-            "content": full_content,
-            "tool_calls": tool_calls if tool_calls else None
-        }
-        self.conversation_history.append(assistant_message)
+            # Add assistant message to history
+            assistant_message = {
+                "role": "assistant", 
+                "content": full_content,
+                "tool_calls": tool_calls if tool_calls else None
+            }
+            self.conversation_history.append(assistant_message)
 
-        # Handle tool calls if present
-        if tool_calls:
-            self.logger.info(f"Received {len(tool_calls)} tool calls: {[tc['function']['name'] for tc in tool_calls]}")
+            # If no tool calls, we're done - content was already yielded during streaming
+            if not tool_calls:
+                break
+                
+            # Execute tool calls
+            self.logger.info(f"Iteration {current_iteration}: Received {len(tool_calls)} tool calls: {[tc['function']['name'] for tc in tool_calls]}")
             for tool_call in tool_calls:
                 try:
                     arguments = json.loads(tool_call['function']['arguments'])
@@ -294,13 +306,17 @@ class ChatBot:
                         "tool_call_id": tool_call['id'],
                         "content": error_message,
                     })
-
-            # Get final response with streaming
+            
+            # Continue loop to let LLM decide if more tools are needed
+        
+        # If we hit max iterations, get final response without tools
+        if current_iteration >= max_tool_iterations:
+            self.logger.warning(f"Reached maximum tool iterations ({max_tool_iterations}), forcing final response")
             final_response = await self.openai_client.chat.completions.create(
                 model=self.config.openai_config['model'],
-                messages=self.conversation_history,  # Use updated history with tool results
+                messages=self.conversation_history,
                 tools=tools_param,
-                tool_choice="none",
+                tool_choice="none",  # Force final response
                 temperature=self.config.openai_config['temperature'],
                 top_p=self.config.openai_config['top_p'],
                 max_tokens=self.config.openai_config['max_tokens'],
@@ -309,17 +325,18 @@ class ChatBot:
                 stream=True
             )
             
-            # Stream final response
-            final_content = ""
             async for chunk in final_response:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
                 if delta.content:
-                    final_content += delta.content
                     yield delta.content
             
             # Add final message to history
+            final_content = ""
+            async for chunk in final_response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    final_content += chunk.choices[0].delta.content
             self.conversation_history.append({"role": "assistant", "content": final_content})
 
     def _extract_tool_content(self, result) -> str:
