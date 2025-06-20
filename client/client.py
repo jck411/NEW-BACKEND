@@ -130,12 +130,19 @@ class ChatBot:
             raise RuntimeError("Session is not initialized. Call connect_to_server() first.")
             
         tools_result = await self.session.list_tools()
+        
+        # Enhanced descriptions with config structure information
+        enhanced_descriptions = {
+            "update_config": "Update a configuration value. Available sections: 'openai' (model, temperature, max_tokens, top_p, presence_penalty, frequency_penalty), 'chatbot' (system_prompt, max_conversation_history, clear_history_on_exit), 'logging' (enabled, level, log_file). Use format: {'section': 'section_name', 'key': 'config_key', 'value': 'new_value'}. Example: to update temperature use {'section': 'openai', 'key': 'temperature', 'value': '0.7'}",
+            "get_config": "Get current configuration. Available sections: 'openai', 'chatbot', 'logging'. If section parameter is provided, returns only that section. If no section provided, returns all configuration.",
+        }
+        
         return [
             {
                 "type": "function",
                 "function": {
                     "name": tool.name,
-                    "description": tool.description,
+                    "description": enhanced_descriptions.get(tool.name, tool.description),
                     "parameters": tool.inputSchema,
                 },
             }
