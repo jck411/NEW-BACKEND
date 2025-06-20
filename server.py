@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Optional
 import os
 import time
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 from mcp.server.fastmcp import FastMCP
 
@@ -15,34 +17,61 @@ mcp = FastMCP("config_aware_server")
 # Global configuration storage - will be loaded from server's own config file
 _config = {}
 _config_file_path = "server_config.yaml"
-_last_config_mtime = 0
+_config_version = 0  # Increment when config changes
+_config_observer = None
 
-def _check_and_reload_config():
-    """Check if config file has been modified and reload if necessary."""
-    global _config, _last_config_mtime
+class ConfigFileHandler(FileSystemEventHandler):
+    """Handle file system events for config file changes."""
     
-    try:
-        if Path(_config_file_path).exists():
-            current_mtime = os.path.getmtime(_config_file_path)
-            if current_mtime > _last_config_mtime:
+    def on_modified(self, event):
+        if event.src_path.endswith('server_config.yaml') and not event.is_directory:
+            self._reload_config()
+    
+    def on_moved(self, event):
+        if event.dest_path.endswith('server_config.yaml') and not event.is_directory:
+            self._reload_config()
+    
+    def _reload_config(self):
+        """Reload configuration from file."""
+        global _config, _config_version
+        try:
+            if Path(_config_file_path).exists():
                 with open(_config_file_path, 'r') as f:
                     loaded_config = yaml.safe_load(f)
                     if loaded_config:
                         _config = loaded_config
-                        _last_config_mtime = current_mtime
-                        print(f"Configuration reloaded from {_config_file_path} (mtime: {current_mtime})")
-                        return True
-    except Exception as e:
-        print(f"Error reloading configuration: {e}")
-    
-    return False
+                        _config_version += 1
+                        print(f"Configuration auto-reloaded (version {_config_version})")
+        except Exception as e:
+            print(f"Error auto-reloading configuration: {e}")
+
+def _start_config_watcher():
+    """Start watching the config file for changes."""
+    global _config_observer
+    if _config_observer is None:
+        _config_observer = Observer()
+        _config_observer.schedule(ConfigFileHandler(), path='.', recursive=False)
+        _config_observer.start()
+        print("Config file watcher started")
+    return _config_observer
+
+def _stop_config_watcher():
+    """Stop the config file watcher."""
+    global _config_observer
+    if _config_observer:
+        _config_observer.stop()
+        _config_observer.join()
+        _config_observer = None
+        print("Config file watcher stopped")
+
+@mcp.tool()
+def get_config_version() -> str:
+    """Get current configuration version for efficient change detection."""
+    return str(_config_version)
 
 @mcp.tool()
 def get_config(section: Optional[str] = None) -> str:
     """Get current configuration. Available sections: 'openai', 'chatbot', 'logging'. If section parameter is provided, returns only that section. If no section provided, returns all configuration."""
-    # Check for config file changes and reload if necessary
-    _check_and_reload_config()
-    
     if section:
         if section in _config:
             return json.dumps({section: _config[section]}, indent=2)
@@ -69,11 +98,15 @@ def update_config(section: str, key: str, value: str) -> str:
     old_value = _config[section][key]
     _config[section][key] = parsed_value
     
+    # Increment version for programmatic changes
+    global _config_version
+    _config_version += 1
+    
     # Auto-save the configuration to maintain persistence
     try:
         with open("server_config.yaml", 'w') as f:
             yaml.dump(_config, f, default_flow_style=False, indent=2)
-        save_status = " (saved to server config)"
+        save_status = f" (saved to server config, version {_config_version})"
     except Exception as e:
         save_status = f" (warning: could not save to file - {str(e)})"
     
@@ -193,8 +226,8 @@ if __name__ == "__main__":
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     _config = loaded_config
-                    _last_config_mtime = os.path.getmtime(config_file)
-                    print(f"Loaded server configuration from {config_file}")
+                    _config_version = 1  # Start with version 1
+                    print(f"Loaded server configuration from {config_file} (version {_config_version})")
                 else:
                     print(f"Warning: Configuration file {config_file} is empty, using defaults")
                     # Set default configuration
@@ -218,6 +251,7 @@ if __name__ == "__main__":
                             "log_file": "chatbot.log"
                         }
                     }
+                    _config_version = 1
         except Exception as e:
             print(f"Warning: Could not load configuration from {config_file}: {e}")
             print("Using default configuration")
@@ -242,6 +276,7 @@ if __name__ == "__main__":
                     "log_file": "chatbot.log"
                 }
             }
+            _config_version = 1
     else:
         print(f"No configuration file found at {config_file}, using defaults")
         # Set default configuration
@@ -265,5 +300,17 @@ if __name__ == "__main__":
                 "log_file": "chatbot.log"
             }
         }
+        _config_version = 1
     
-    mcp.run() 
+    # Start the config file watcher for event-driven updates
+    try:
+        _start_config_watcher()
+    except Exception as e:
+        print(f"Warning: Could not start config file watcher: {e}")
+        print("Config changes will not be detected in real-time")
+    
+    try:
+        mcp.run()
+    finally:
+        # Clean up the config watcher on exit
+        _stop_config_watcher() 

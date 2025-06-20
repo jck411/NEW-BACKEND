@@ -143,70 +143,46 @@ class ChatBot:
         ]
 
     async def _update_config_if_changed(self):
-        """Check if any configuration has changed in server config and update if necessary."""
+        """Check if configuration version has changed and update if necessary."""
         if self.session is None:
             return
             
         try:
-            # Get current full config from server
-            result = await self.session.call_tool(
-                "get_config",
-                arguments={}
-            )
+            # Lightweight version check
+            result = await self.session.call_tool("get_config_version", arguments={})
+            new_version = self._extract_tool_content(result).strip()
             
-            content_text = self._extract_tool_content(result)
-            server_config = json.loads(content_text)
-            
-            # Check if config has changed by comparing with current config
-            config_changed = False
-            
-            # Check OpenAI config changes
-            if "openai" in server_config:
-                current_openai = self.config.openai_config
-                new_openai = server_config["openai"]
-                if current_openai != new_openai:
-                    config_changed = True
-                    self.logger.info(f"OpenAI config changed - Model: {current_openai.get('model', 'unknown')} -> {new_openai.get('model', 'unknown')}")
-            
-            # Check chatbot config changes (system prompt, etc.)
-            if "chatbot" in server_config:
-                current_chatbot = self.config.chatbot_config
-                new_chatbot = server_config["chatbot"]
-                if current_chatbot != new_chatbot:
-                    config_changed = True
-                    new_system_prompt = new_chatbot.get("system_prompt", "")
-                    current_system_prompt = self.system_message.get("content", "")
-                    if new_system_prompt != current_system_prompt:
-                        self.logger.info(f"System prompt updated to: {new_system_prompt[:50]}...")
-            
-            # Check logging config changes
-            if "logging" in server_config:
-                current_logging = self.config.config.get("logging", {})
-                new_logging = server_config["logging"]
-                if current_logging != new_logging:
-                    config_changed = True
-                    self.logger.info("Logging config updated")
-            
-            if config_changed:
-                # Reload full config from server
-                await self.config.load_from_server(self.session)
+            # Only reload if version changed
+            if not hasattr(self, '_config_version') or self._config_version != new_version:
+                # Get full config only when needed
+                result = await self.session.call_tool("get_config", arguments={})
+                content_text = self._extract_tool_content(result)
+                server_config = json.loads(content_text)
                 
-                # Update system message if it changed
-                if "chatbot" in server_config:
-                    new_system_prompt = server_config["chatbot"].get("system_prompt", "")
+                # Update local config directly
+                self.config.config = server_config
+                
+                # Update logging configuration if changed
+                if 'logging' in server_config and server_config['logging']['enabled']:
+                    import logging
+                    log_level = getattr(logging, server_config['logging']['level'].upper())
+                    logging.getLogger().setLevel(log_level)
+                
+                # Update system message if changed
+                new_system_prompt = server_config.get("chatbot", {}).get("system_prompt", "")
+                if self.system_message.get("content") != new_system_prompt:
                     self.system_message["content"] = new_system_prompt
-                    
-                    # Update first message in conversation history (should be system message)
                     if self.conversation_history and self.conversation_history[0]["role"] == "system":
                         self.conversation_history[0]["content"] = new_system_prompt
                     else:
-                        # If somehow system message is not first, insert it
                         self.conversation_history.insert(0, self.system_message)
-                        
-                self.logger.info("Configuration reloaded from server")
+                    self.logger.info(f"System prompt updated: {new_system_prompt[:50]}...")
+                
+                self._config_version = new_version
+                self.logger.info(f"Configuration updated from server (version: {new_version})")
                         
         except Exception as e:
-            self.logger.warning(f"Failed to update config from server: {e}")
+            self.logger.warning(f"Failed to check config version: {e}")
 
     async def process_message(self, user_message: str):
         """Process a user message maintaining conversation context."""
