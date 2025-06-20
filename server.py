@@ -96,8 +96,7 @@ def reset_config() -> str:
         "chatbot": {
             "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
             "max_conversation_history": 100,
-            "clear_history_on_exit": True,
-            "stream_responses": True
+            "clear_history_on_exit": True
         },
         "logging": {
             "enabled": True,
@@ -181,8 +180,7 @@ if __name__ == "__main__":
                         "chatbot": {
                             "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
                             "max_conversation_history": 100,
-                            "clear_history_on_exit": True,
-                            "stream_responses": True
+                            "clear_history_on_exit": True
                         },
                         "logging": {
                             "enabled": True,
@@ -206,8 +204,7 @@ if __name__ == "__main__":
                 "chatbot": {
                     "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
                     "max_conversation_history": 100,
-                    "clear_history_on_exit": True,
-                    "stream_responses": True
+                    "clear_history_on_exit": True
                 },
                 "logging": {
                     "enabled": True,
@@ -230,8 +227,7 @@ if __name__ == "__main__":
             "chatbot": {
                 "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
                 "max_conversation_history": 100,
-                "clear_history_on_exit": True,
-                "stream_responses": True
+                "clear_history_on_exit": True
             },
             "logging": {
                 "enabled": True,

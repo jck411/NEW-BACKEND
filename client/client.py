@@ -184,12 +184,8 @@ class ChatBot:
         # Check if system prompt has changed and update if necessary
         await self._update_system_prompt_if_changed()
         
-        if self.config.chatbot_config.get('stream_responses', False):
-            async for chunk in self._process_message_streaming(user_message):
-                yield chunk
-        else:
-            result = await self._process_message_non_streaming(user_message)
-            yield result
+        async for chunk in self._process_message_streaming(user_message):
+            yield chunk
 
     async def _process_message_streaming(self, user_message: str) -> AsyncGenerator[str, None]:
         """Process message with streaming responses."""
@@ -230,7 +226,7 @@ class ChatBot:
         # Handle streaming response
         full_content = ""
         tool_calls = []
-        tool_calls_dict = {}  # Use dict to properly accumulate tool calls by index
+        tool_calls_dict = {}  # Accumulate tool calls by index
         
         async for chunk in response:
             if not chunk.choices:
@@ -242,7 +238,7 @@ class ChatBot:
                 full_content += delta.content
                 yield delta.content
             
-            # Handle tool calls - FIXED LOGIC
+            # Handle tool calls
             if delta.tool_calls:
                 for delta_tool_call in delta.tool_calls:
                     idx = delta_tool_call.index
@@ -273,7 +269,7 @@ class ChatBot:
         }
         self.conversation_history.append(assistant_message)
 
-        # Handle tool calls if present - SIMPLIFIED LOGIC
+        # Handle tool calls if present
         if tool_calls:
             self.logger.info(f"Received {len(tool_calls)} tool calls: {[tc['function']['name'] for tc in tool_calls]}")
             for tool_call in tool_calls:
@@ -325,88 +321,6 @@ class ChatBot:
             
             # Add final message to history
             self.conversation_history.append({"role": "assistant", "content": final_content})
-
-    async def _process_message_non_streaming(self, user_message: str) -> str:
-        """Process message without streaming responses."""
-        if self.session is None:
-            raise RuntimeError("Session is not initialized")
-
-        # Manage conversation history size
-        if len(self.conversation_history) > self.config.chatbot_config['max_conversation_history']:
-            # Keep system message and trim oldest messages
-            self.conversation_history = [self.system_message] + self.conversation_history[-(self.config.chatbot_config['max_conversation_history']-1):]
-            self.logger.info("Conversation history trimmed to maintain size limit")
-
-        self.conversation_history.append({"role": "user", "content": user_message})
-        
-        tools = await self.get_mcp_tools()
-        from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
-        messages: List[ChatCompletionMessageParam] = self.conversation_history  # type: ignore
-        tools_param: List[ChatCompletionToolParam] = tools  # type: ignore
-        
-        # Get initial response without streaming
-        response = await self.openai_client.chat.completions.create(
-            model=self.config.openai_config['model'],
-            messages=messages,
-            tools=tools_param,
-            tool_choice="auto",
-            temperature=self.config.openai_config['temperature'],
-            top_p=self.config.openai_config['top_p'],
-            max_tokens=self.config.openai_config['max_tokens'],
-            presence_penalty=self.config.openai_config['presence_penalty'],
-            frequency_penalty=self.config.openai_config['frequency_penalty'],
-            stream=False
-        )
-
-        assistant_message = response.choices[0].message
-        self.conversation_history.append(assistant_message.model_dump())
-
-        # Handle tool calls if present
-        if assistant_message.tool_calls:
-            for tool_call in assistant_message.tool_calls:
-                try:
-                    arguments = json.loads(tool_call.function.arguments)
-                    result = await self.session.call_tool(
-                        tool_call.function.name,
-                        arguments=arguments,
-                    )
-
-                    content_text = self._extract_tool_content(result)
-                    
-                    # Add tool response to conversation
-                    self.conversation_history.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": content_text,
-                    })
-                except Exception as e:
-                    error_message = f"Error executing tool {tool_call.function.name}: {str(e)}"
-                    self.logger.error(error_message)
-                    self.conversation_history.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": error_message,
-                    })
-
-            # Get final response without streaming
-            final_response = await self.openai_client.chat.completions.create(
-                model=self.config.openai_config['model'],
-                messages=messages,
-                tools=tools_param,
-                tool_choice="none",
-                temperature=self.config.openai_config['temperature'],
-                top_p=self.config.openai_config['top_p'],
-                max_tokens=self.config.openai_config['max_tokens'],
-                presence_penalty=self.config.openai_config['presence_penalty'],
-                frequency_penalty=self.config.openai_config['frequency_penalty'],
-                stream=False
-            )
-            
-            final_message = final_response.choices[0].message
-            self.conversation_history.append(final_message.model_dump())
-            return final_message.content or ""
-
-        return assistant_message.content or ""
 
     def _extract_tool_content(self, result) -> str:
         """Extract content from tool results."""
