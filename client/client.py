@@ -9,12 +9,13 @@ from dotenv import load_dotenv
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from openai import AsyncOpenAI
+import os
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
 
 # Load environment variables
-load_dotenv("/home/human/AAREPOS/NEW BACKEND/.env")
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 class ServerConfig:
     """Configuration manager that gets all config from the MCP server."""
