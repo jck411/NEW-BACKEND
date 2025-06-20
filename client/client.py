@@ -84,8 +84,18 @@ class ChatBot:
         
         self.logger.info("ChatBot initialized (config will be loaded from server)")
 
-    async def connect_to_server(self, python_path: str = "/home/human/AAAVENVS/NEWBKND/bin/python", script_path: str = "/home/human/AAREPOS/NEW BACKEND/server.py"):
+    async def connect_to_server(self, python_path: str = None, script_path: str = None):
         """Connect to an MCP server and load configuration."""
+        # Use current Python executable if not specified
+        if python_path is None:
+            import sys
+            python_path = sys.executable
+        
+        # Use relative path to server.py if not specified
+        if script_path is None:
+            import os
+            script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "server.py")
+        
         server_params = StdioServerParameters(
             command=python_path,
             args=[script_path],
@@ -413,7 +423,7 @@ class ChatBot:
 
     async def cleanup(self):
         """Clean up resources."""
-        if self.config.chatbot_config['clear_history_on_exit']:
+        if self.config.chatbot_config.get('clear_history_on_exit', False):
             self.conversation_history.clear()
             self.logger.info("Conversation history cleared on exit")
         await self.exit_stack.aclose()
