@@ -314,14 +314,22 @@ class ChatBot:
             
             # Continue loop to let LLM decide if more tools are needed
         
-        # If we hit max iterations, get final response without tools
+        # If we hit max iterations, ask LLM to summarize and ask for continuation
         if current_iteration >= max_tool_iterations:
-            self.logger.warning(f"Reached maximum tool iterations ({max_tool_iterations}), forcing final response")
-            final_response = await self.openai_client.chat.completions.create(
+            self.logger.info(f"Reached maximum tool iterations ({max_tool_iterations}), asking LLM to summarize progress")
+            
+            # Add a system message asking for summary and continuation prompt
+            summary_prompt = {
+                "role": "user", 
+                "content": "I've reached my tool call limit (5 iterations per message). Please summarize what you've accomplished so far, what still needs to be done, and ask if I'd like you to continue by sending another message."
+            }
+            self.conversation_history.append(summary_prompt)
+            
+            summary_response = await self.openai_client.chat.completions.create(
                 model=self.config.openai_config['model'],
                 messages=self.conversation_history,
                 tools=tools_param,
-                tool_choice="none",  # Force final response
+                tool_choice="none",  # No more tools for this summary
                 temperature=self.config.openai_config['temperature'],
                 top_p=self.config.openai_config['top_p'],
                 max_tokens=self.config.openai_config['max_tokens'],
@@ -330,19 +338,17 @@ class ChatBot:
                 stream=True
             )
             
-            async for chunk in final_response:
+            summary_content = ""
+            async for chunk in summary_response:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
                 if delta.content:
+                    summary_content += delta.content
                     yield delta.content
             
-            # Add final message to history
-            final_content = ""
-            async for chunk in final_response:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    final_content += chunk.choices[0].delta.content
-            self.conversation_history.append({"role": "assistant", "content": final_content})
+            # Add summary to conversation history
+            self.conversation_history.append({"role": "assistant", "content": summary_content})
 
     def _extract_tool_content(self, result) -> str:
         """Extract content from tool results."""
