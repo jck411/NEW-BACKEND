@@ -130,66 +130,88 @@ class ChatBot:
             raise RuntimeError("Session is not initialized. Call connect_to_server() first.")
             
         tools_result = await self.session.list_tools()
-        
-        # Enhanced descriptions with config structure information
-        enhanced_descriptions = {
-            "update_config": "Update a configuration value. Available sections: 'openai' (model, temperature, max_tokens, top_p, presence_penalty, frequency_penalty), 'chatbot' (system_prompt, max_conversation_history, clear_history_on_exit), 'logging' (enabled, level, log_file). Use format: {'section': 'section_name', 'key': 'config_key', 'value': 'new_value'}. Example: to update temperature use {'section': 'openai', 'key': 'temperature', 'value': '0.7'}",
-            "get_config": "Get current configuration. Available sections: 'openai', 'chatbot', 'logging'. If section parameter is provided, returns only that section. If no section provided, returns all configuration.",
-        }
-        
         return [
             {
                 "type": "function",
                 "function": {
                     "name": tool.name,
-                    "description": enhanced_descriptions.get(tool.name, tool.description),
+                    "description": tool.description,
                     "parameters": tool.inputSchema,
                 },
             }
             for tool in tools_result.tools
         ]
 
-    async def _update_system_prompt_if_changed(self):
-        """Check if system prompt has changed in server config and update if necessary."""
+    async def _update_config_if_changed(self):
+        """Check if any configuration has changed in server config and update if necessary."""
         if self.session is None:
             return
             
         try:
-            # Get current system prompt from server
+            # Get current full config from server
             result = await self.session.call_tool(
                 "get_config",
-                arguments={"section": "chatbot"}
+                arguments={}
             )
             
             content_text = self._extract_tool_content(result)
             server_config = json.loads(content_text)
             
+            # Check if config has changed by comparing with current config
+            config_changed = False
+            
+            # Check OpenAI config changes
+            if "openai" in server_config:
+                current_openai = self.config.openai_config
+                new_openai = server_config["openai"]
+                if current_openai != new_openai:
+                    config_changed = True
+                    self.logger.info(f"OpenAI config changed - Model: {current_openai.get('model', 'unknown')} -> {new_openai.get('model', 'unknown')}")
+            
+            # Check chatbot config changes (system prompt, etc.)
             if "chatbot" in server_config:
-                new_system_prompt = server_config["chatbot"].get("system_prompt", "")
-                current_system_prompt = self.system_message.get("content", "")
+                current_chatbot = self.config.chatbot_config
+                new_chatbot = server_config["chatbot"]
+                if current_chatbot != new_chatbot:
+                    config_changed = True
+                    new_system_prompt = new_chatbot.get("system_prompt", "")
+                    current_system_prompt = self.system_message.get("content", "")
+                    if new_system_prompt != current_system_prompt:
+                        self.logger.info(f"System prompt updated to: {new_system_prompt[:50]}...")
+            
+            # Check logging config changes
+            if "logging" in server_config:
+                current_logging = self.config.config.get("logging", {})
+                new_logging = server_config["logging"]
+                if current_logging != new_logging:
+                    config_changed = True
+                    self.logger.info("Logging config updated")
+            
+            if config_changed:
+                # Reload full config from server
+                await self.config.load_from_server(self.session)
                 
-                if new_system_prompt != current_system_prompt:
-                    # Reload full config from server
-                    await self.config.load_from_server(self.session)
-                    
-                    # Update system message
+                # Update system message if it changed
+                if "chatbot" in server_config:
+                    new_system_prompt = server_config["chatbot"].get("system_prompt", "")
                     self.system_message["content"] = new_system_prompt
                     
                     # Update first message in conversation history (should be system message)
                     if self.conversation_history and self.conversation_history[0]["role"] == "system":
                         self.conversation_history[0]["content"] = new_system_prompt
-                        self.logger.info(f"System prompt updated to: {new_system_prompt[:50]}...")
                     else:
                         # If somehow system message is not first, insert it
                         self.conversation_history.insert(0, self.system_message)
-                        self.logger.info("System message added to conversation history")
+                        
+                self.logger.info("Configuration reloaded from server")
+                        
         except Exception as e:
-            self.logger.warning(f"Failed to update system prompt from server: {e}")
+            self.logger.warning(f"Failed to update config from server: {e}")
 
     async def process_message(self, user_message: str):
         """Process a user message maintaining conversation context."""
-        # Check if system prompt has changed and update if necessary
-        await self._update_system_prompt_if_changed()
+        # Check if any configuration has changed and update if necessary
+        await self._update_config_if_changed()
         
         async for chunk in self._process_message_streaming(user_message):
             yield chunk

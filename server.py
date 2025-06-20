@@ -4,6 +4,8 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import os
+import time
 
 from mcp.server.fastmcp import FastMCP
 
@@ -12,10 +14,35 @@ mcp = FastMCP("config_aware_server")
 
 # Global configuration storage - will be loaded from server's own config file
 _config = {}
+_config_file_path = "server_config.yaml"
+_last_config_mtime = 0
+
+def _check_and_reload_config():
+    """Check if config file has been modified and reload if necessary."""
+    global _config, _last_config_mtime
+    
+    try:
+        if Path(_config_file_path).exists():
+            current_mtime = os.path.getmtime(_config_file_path)
+            if current_mtime > _last_config_mtime:
+                with open(_config_file_path, 'r') as f:
+                    loaded_config = yaml.safe_load(f)
+                    if loaded_config:
+                        _config = loaded_config
+                        _last_config_mtime = current_mtime
+                        print(f"Configuration reloaded from {_config_file_path} (mtime: {current_mtime})")
+                        return True
+    except Exception as e:
+        print(f"Error reloading configuration: {e}")
+    
+    return False
 
 @mcp.tool()
 def get_config(section: Optional[str] = None) -> str:
-    """Get current configuration. If section is provided, returns only that section."""
+    """Get current configuration. Available sections: 'openai', 'chatbot', 'logging'. If section parameter is provided, returns only that section. If no section provided, returns all configuration."""
+    # Check for config file changes and reload if necessary
+    _check_and_reload_config()
+    
     if section:
         if section in _config:
             return json.dumps({section: _config[section]}, indent=2)
@@ -25,7 +52,7 @@ def get_config(section: Optional[str] = None) -> str:
 
 @mcp.tool()
 def update_config(section: str, key: str, value: str) -> str:
-    """Update a configuration value. Value will be parsed as JSON if possible."""
+    """Update a configuration value. Available sections: 'openai' (model, temperature, max_tokens, top_p, presence_penalty, frequency_penalty), 'chatbot' (system_prompt, max_conversation_history, clear_history_on_exit), 'logging' (enabled, level, log_file). Use format: section='openai', key='temperature', value='0.7'. Value will be parsed as JSON if possible."""
     if section not in _config:
         return f"Configuration section '{section}' not found. Available sections: {list(_config.keys())}"
     
@@ -158,12 +185,15 @@ def calculate(operation: str, a: float, b: float) -> str:
 if __name__ == "__main__":
     # Load configuration from server's own config file
     config_file = "server_config.yaml"
+    _config_file_path = config_file
+    
     if Path(config_file).exists():
         try:
             with open(config_file, 'r') as f:
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     _config = loaded_config
+                    _last_config_mtime = os.path.getmtime(config_file)
                     print(f"Loaded server configuration from {config_file}")
                 else:
                     print(f"Warning: Configuration file {config_file} is empty, using defaults")
