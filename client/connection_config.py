@@ -47,7 +47,7 @@ class ConnectionConfig:
                 "Please set server_path to the path of your MCP server."
             )
         
-        return ["python", server_path]
+        return ["python3", server_path]
     
     def get_server_path(self) -> str:
         """Get the configured server path."""
