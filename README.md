@@ -37,42 +37,100 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ## Usage
 
-### Basic Usage
+### Running the Server
+
+You can run the MCP server in several ways:
+
+1. **Using the convenience script (recommended):**
+```bash
+python run_server.py
+```
+
+2. **Directly from the server directory:**
+```bash
+cd server
+python server.py
+```
+
+3. **From the root directory:**
+```bash
+python server/server.py
+```
+
+### Basic Client Usage
 
 ```python
 import asyncio
-from client.client import connect_to_server, process_query, cleanup
+from client import ChatBot
 
 async def main():
-    # Connect to your MCP server
-    await connect_to_server("path/to/your/server.py")
+    # Create chatbot instance
+    bot = ChatBot()
     
-    # Process a query
-    response = await process_query("What tools are available?")
-    print(response)
+    # Connect to the server
+    await bot.connect_to_server(server_command=["python", "server/server.py"])
+    # or use the convenience script
+    # await bot.connect_to_server(server_command=["python", "run_server.py"])
+    
+    # Process a message
+    async for response in bot.process_message("What tools are available?"):
+        print(response, end="")
     
     # Clean up resources
-    await cleanup()
+    await bot.cleanup()
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### CLI Usage
+
+```bash
+# Connect to the configured server
+python -m client.cli
+
+# Connect with direct server command
+python -m client.cli --server-command "python server/server.py"
+
+# Show server requirements
+python -m client.cli --show-requirements
+```
+
 ### Configuration
 
-The client can be configured by modifying the global variables in `client.py`:
+The client configuration is managed through `client/client_config.yaml`:
 
-- `model`: OpenAI model to use (default: "gpt-4o")
-- Server path in `connect_to_server()` function
-- Python interpreter path in `StdioServerParameters`
+```yaml
+server_path: /path/to/your/server/server.py
+```
+
+The server configuration is managed through files in the `server/` directory:
+- `server/dynamic_client_config.yaml` - Active server configuration
+- `server/default_client_config.yaml` - Default configuration values
+
+For detailed server configuration options, see `server/SERVER_INTERFACE.md`.
 
 ## Project Structure
 
 ```
 NEW BACKEND/
-├── client/
-│   └── client.py          # Main MCP client implementation
-├── requirements.txt       # Python dependencies
+├── client/                 # MCP client implementation
+│   ├── __init__.py
+│   ├── chatbot.py
+│   ├── cli.py
+│   ├── config.py
+│   ├── connection_config.py
+│   ├── conversation.py
+│   ├── session.py
+│   └── client_config.yaml
+├── server/                 # MCP server implementation
+│   ├── server.py
+│   ├── dynamic_client_config.yaml
+│   ├── default_client_config.yaml
+│   ├── SERVER_INTERFACE.md
+│   └── requirements.txt
+├── run_server.py          # Convenience script to run server
+├── requirements.txt       # Combined Python dependencies
 ├── .env                  # Environment variables (create this)
 ├── .gitignore           # Git ignore rules
 └── README.md            # This file
@@ -80,17 +138,19 @@ NEW BACKEND/
 
 ## API Reference
 
-### `connect_to_server(server_script_path: str)`
+### `ChatBot`
+Main chatbot class that orchestrates configuration, session, and conversation management.
+
+### `ChatBot.connect_to_server(server_command=None, **server_params)`
 Establishes connection to an MCP server.
 
-### `get_mcp_tools() -> List[Dict[str, Any]]`
-Retrieves available tools from the MCP server in OpenAI format.
+### `ChatBot.process_message(message: str)`
+Processes a user message using OpenAI with available MCP tools.
 
-### `process_query(query: str) -> str`
-Processes a user query using OpenAI with available MCP tools.
-
-### `cleanup()`
+### `ChatBot.cleanup()`
 Cleans up resources and closes connections.
+
+For detailed API documentation, see the docstrings in the client modules.
 
 ## Dependencies
 

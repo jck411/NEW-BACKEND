@@ -70,15 +70,13 @@ from .config import ServerConfig
 from .session import MCPSession
 from .conversation import ConversationManager
 from .connection_config import ConnectionConfig
-from .cli import main
 
 __all__ = [
     'ChatBot',
     'ServerConfig', 
     'MCPSession',
     'ConversationManager',
-    'ConnectionConfig',
-    'main'
+    'ConnectionConfig'
 ]
 
 __version__ = '1.0.0' 

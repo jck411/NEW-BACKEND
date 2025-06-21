@@ -44,7 +44,7 @@ Successfully refactored the MCP ChatBot client to be **100% server-dependent** w
 ### `client/client_config.yaml`
 ```yaml
 default_server:
-  command: ["python", "server.py"]
+  command: ["python", "server/server.py"]
   description: "Default MCP server"
 
 servers:
@@ -86,10 +86,10 @@ python -m client.cli --server development
 python -m client.cli --list-servers
 
 # Add new server configuration
-python -m client.cli --add-server myserver "python /path/to/server.py" "My custom server"
+python -m client.cli --add-server myserver "python /path/to/server/server.py" "My custom server"
 
 # Override with direct command
-python -m client.cli --server-command "python /path/to/any/server.py"
+python -m client.cli --server-command "python /path/to/any/server/server.py"
 ```
 
 ### Programmatic Usage
@@ -102,13 +102,13 @@ bot = ChatBot()
 await bot.connect_to_server(server_name="production")
 
 # Connect with direct command (overrides config)
-await bot.connect_to_server(server_command=["python", "/path/to/server.py"])
+await bot.connect_to_server(server_command=["python", "/path/to/server/server.py"])
 
 # Connect to default server
 await bot.connect_to_server()
 
 # Manage server configurations
-bot.add_server_config("newserver", ["python", "/path/to/new/server.py"], "New server")
+bot.add_server_config("newserver", ["python", "/path/to/new/server/server.py"], "New server")
 servers = bot.get_available_servers()
 ```
 
@@ -163,18 +163,18 @@ await bot.connect_to_server(
 # New way with configuration
 await bot.connect_to_server(server_name="production")
 # or
-await bot.connect_to_server(server_command=["python", "/path/to/server.py"])
+await bot.connect_to_server(server_command=["python", "/path/to/server/server.py"])
 ```
 
 ## Server Location Examples
 
 The client can now connect to servers anywhere:
 
-- **Local**: `["python", "./server.py"]`
-- **Absolute Path**: `["python", "/home/user/project/server.py"]`
-- **Remote Mount**: `["python", "/mnt/shared/server.py"]`
+- **Local**: `["python", "./server/server.py"]`
+- **Absolute Path**: `["python", "/home/user/project/server/server.py"]`
+- **Remote Mount**: `["python", "/mnt/shared/server/server.py"]`
 - **Different Language**: `["node", "/path/to/server.js"]`
 - **Compiled Binary**: `["/usr/local/bin/config_server"]`
-- **With Parameters**: `["python", "/path/to/server.py", "--config", "/custom/config"]`
+- **With Parameters**: `["python", "/path/to/server/server.py", "--config", "/custom/config"]`
 
 The architecture is now completely clean, server-agnostic, and maintains 100% server dependency for configuration while eliminating all legacy code patterns. 

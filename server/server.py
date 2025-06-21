@@ -16,8 +16,8 @@ mcp = FastMCP("config_aware_server")
 
 # Global configuration storage - will be loaded from server's own config file
 _config = {}
-_default_config = {}  # Loaded once at startup from default_config.yaml
-_config_file_path = "config.yaml"
+_default_config = {}  # Loaded once at startup from default_client_config.yaml
+_config_file_path = "dynamic_client_config.yaml"
 _config_version = 0  # Increment when config changes
 _config_observer = None
 
@@ -25,11 +25,11 @@ class ConfigFileHandler(FileSystemEventHandler):
     """Handle file system events for config file changes."""
     
     def on_modified(self, event):
-        if event.src_path.endswith('config.yaml') and not event.is_directory:
+        if event.src_path.endswith('dynamic_client_config.yaml') and not event.is_directory:
             self._reload_config()
     
     def on_moved(self, event):
-        if event.dest_path.endswith('config.yaml') and not event.is_directory:
+        if event.dest_path.endswith('dynamic_client_config.yaml') and not event.is_directory:
             self._reload_config()
     
     def _reload_config(self):
@@ -51,7 +51,9 @@ def _start_config_watcher():
     global _config_observer
     if _config_observer is None:
         _config_observer = Observer()
-        _config_observer.schedule(ConfigFileHandler(), path='.', recursive=False)
+        # Watch the server directory
+        script_dir = Path(__file__).parent.absolute()
+        _config_observer.schedule(ConfigFileHandler(), path=str(script_dir), recursive=False)
         _config_observer.start()
         print("Config file watcher started")
     return _config_observer
@@ -105,7 +107,9 @@ def update_config(section: str, key: str, value: str) -> str:
     
     # Auto-save the configuration to maintain persistence
     try:
-        with open("config.yaml", 'w') as f:
+        script_dir = Path(__file__).parent.absolute()
+        config_file = script_dir / "dynamic_client_config.yaml"
+        with open(config_file, 'w') as f:
             yaml.dump(_config, f, default_flow_style=False, indent=2)
         save_status = f" (saved to server config, version {_config_version})"
     except Exception as e:
@@ -114,9 +118,14 @@ def update_config(section: str, key: str, value: str) -> str:
     return f"Updated {section}.{key} from '{old_value}' to '{parsed_value}'{save_status}"
 
 @mcp.tool()
-def save_config(filepath: str = "config.yaml") -> str:
+def save_config(filepath: str = "dynamic_client_config.yaml") -> str:
     """Save current configuration to a YAML file."""
     try:
+        # If relative path, make it relative to server directory
+        if not Path(filepath).is_absolute():
+            script_dir = Path(__file__).parent.absolute()
+            filepath = script_dir / filepath
+        
         with open(filepath, 'w') as f:
             yaml.dump(_config, f, default_flow_style=False, indent=2)
         return f"Configuration saved to {filepath}"
@@ -124,10 +133,15 @@ def save_config(filepath: str = "config.yaml") -> str:
         return f"Error saving configuration: {str(e)}"
 
 @mcp.tool()
-def load_config(filepath: str = "config.yaml") -> str:
+def load_config(filepath: str = "dynamic_client_config.yaml") -> str:
     """Load configuration from a YAML file."""
     global _config
     try:
+        # If relative path, make it relative to server directory
+        if not Path(filepath).is_absolute():
+            script_dir = Path(__file__).parent.absolute()
+            filepath = script_dir / filepath
+            
         if Path(filepath).exists():
             with open(filepath, 'r') as f:
                 loaded_config = yaml.safe_load(f)
@@ -147,17 +161,17 @@ def reset_config() -> str:
     global _config
     if _default_config:
         _config = _default_config.copy()
-        return "Configuration reset to default values from default_config.yaml"
+        return "Configuration reset to default values from default_client_config.yaml"
     else:
         return "Error: Default configuration not available"
 
 @mcp.tool()
 def load_defaults() -> str:
-    """Load default configuration from default_config.yaml."""
+    """Load default configuration from default_client_config.yaml."""
     global _config
     if _load_default_config():
         _config = _default_config.copy()
-        return "Default configuration loaded from default_config.yaml"
+        return "Default configuration loaded from default_client_config.yaml"
     else:
         return "Error: Could not load default configuration"
 
@@ -211,32 +225,39 @@ def calculate(operation: str, a: float, b: float) -> str:
         return f"Error: {str(e)}"
 
 def _load_default_config():
-    """Load default configuration from default_config.yaml."""
+    """Load default configuration from default_client_config.yaml."""
     global _default_config
     try:
-        if Path("default_config.yaml").exists():
-            with open("default_config.yaml", 'r') as f:
+        # Get the directory where this script is located
+        script_dir = Path(__file__).parent.absolute()
+        default_config_file = script_dir / "default_client_config.yaml"
+        
+        if default_config_file.exists():
+            with open(default_config_file, 'r') as f:
                 loaded_config = yaml.safe_load(f)
                 if loaded_config:
                     _default_config = loaded_config
-                    print("Loaded default configuration from default_config.yaml")
+                    print(f"Loaded default configuration from {default_config_file}")
                     return True
                 else:
-                    print("Warning: default_config.yaml is empty")
+                    print(f"Warning: {default_config_file} is empty")
                     return False
         else:
-            print("Warning: default_config.yaml not found")
+            print(f"Warning: {default_config_file} not found")
             return False
     except Exception as e:
-        print(f"Warning: Could not load default_config.yaml: {e}")
+        print(f"Warning: Could not load default_client_config.yaml: {e}")
         return False
 
 if __name__ == "__main__":
-    # Load configuration from server's own config file
-    config_file = "config.yaml"
-    _config_file_path = config_file
+    # Get the directory where this script is located
+    script_dir = Path(__file__).parent.absolute()
     
-    if Path(config_file).exists():
+    # Load configuration from server's own config file
+    config_file = script_dir / "dynamic_client_config.yaml"
+    _config_file_path = str(config_file)
+    
+    if config_file.exists():
         try:
             with open(config_file, 'r') as f:
                 loaded_config = yaml.safe_load(f)
