@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import sys
@@ -112,4 +113,10 @@ class MCPSession:
         """Clean up session resources."""
         if self.server_info.get('command'):
             self.logger.info(f"Cleaning up connection to: {' '.join(self.server_info['full_command'])}")
-        await self.exit_stack.aclose() 
+        try:
+            await self.exit_stack.aclose()
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            # Handle graceful shutdown when interrupted
+            pass
+        except Exception as e:
+            self.logger.warning(f"Error during session cleanup: {e}") 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional, AsyncGenerator, Union
@@ -203,7 +204,13 @@ class ChatBot:
 
     async def cleanup(self):
         """Clean up resources."""
-        if self.config.chatbot_config.get('clear_history_on_exit', False):
-            self.conversation_manager.clear_history()
-            self.logger.info("Conversation history cleared on exit (per server configuration)")
-        await self.mcp_session.cleanup() 
+        try:
+            if self.config.chatbot_config.get('clear_history_on_exit', False):
+                self.conversation_manager.clear_history()
+                self.logger.info("Conversation history cleared on exit (per server configuration)")
+            await self.mcp_session.cleanup()
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            # Handle graceful shutdown when interrupted
+            pass
+        except Exception as e:
+            self.logger.warning(f"Error during chatbot cleanup: {e}") 

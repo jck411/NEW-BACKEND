@@ -108,12 +108,20 @@ async def main():
             except Exception as e:
                 print(f"\n❌ Error: {e}")
                 
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
     except Exception as e:
         print(f"\n❌ Error: {e}")
         sys.exit(1)
     finally:
         if 'chatbot' in locals():
-            await chatbot.cleanup()
+            try:
+                await chatbot.cleanup()
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                # Ignore cleanup errors from interrupted operations
+                pass
+            except Exception as e:
+                print(f"Warning: Cleanup error: {e}")
 
 
 if __name__ == "__main__":
