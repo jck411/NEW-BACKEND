@@ -16,7 +16,8 @@ mcp = FastMCP("config_aware_server")
 
 # Global configuration storage - will be loaded from server's own config file
 _config = {}
-_config_file_path = "server_config.yaml"
+_default_config = {}  # Loaded once at startup from default_config.yaml
+_config_file_path = "config.yaml"
 _config_version = 0  # Increment when config changes
 _config_observer = None
 
@@ -24,11 +25,11 @@ class ConfigFileHandler(FileSystemEventHandler):
     """Handle file system events for config file changes."""
     
     def on_modified(self, event):
-        if event.src_path.endswith('server_config.yaml') and not event.is_directory:
+        if event.src_path.endswith('config.yaml') and not event.is_directory:
             self._reload_config()
     
     def on_moved(self, event):
-        if event.dest_path.endswith('server_config.yaml') and not event.is_directory:
+        if event.dest_path.endswith('config.yaml') and not event.is_directory:
             self._reload_config()
     
     def _reload_config(self):
@@ -104,7 +105,7 @@ def update_config(section: str, key: str, value: str) -> str:
     
     # Auto-save the configuration to maintain persistence
     try:
-        with open("server_config.yaml", 'w') as f:
+        with open("config.yaml", 'w') as f:
             yaml.dump(_config, f, default_flow_style=False, indent=2)
         save_status = f" (saved to server config, version {_config_version})"
     except Exception as e:
@@ -113,7 +114,7 @@ def update_config(section: str, key: str, value: str) -> str:
     return f"Updated {section}.{key} from '{old_value}' to '{parsed_value}'{save_status}"
 
 @mcp.tool()
-def save_config(filepath: str = "server_config.yaml") -> str:
+def save_config(filepath: str = "config.yaml") -> str:
     """Save current configuration to a YAML file."""
     try:
         with open(filepath, 'w') as f:
@@ -123,7 +124,7 @@ def save_config(filepath: str = "server_config.yaml") -> str:
         return f"Error saving configuration: {str(e)}"
 
 @mcp.tool()
-def load_config(filepath: str = "server_config.yaml") -> str:
+def load_config(filepath: str = "config.yaml") -> str:
     """Load configuration from a YAML file."""
     global _config
     try:
@@ -144,27 +145,21 @@ def load_config(filepath: str = "server_config.yaml") -> str:
 def reset_config() -> str:
     """Reset configuration to default values."""
     global _config
-    _config = {
-        "openai": {
-            "model": "gpt-4o-mini",
-            "temperature": 0.8,
-            "top_p": 1.0,
-            "max_tokens": 2000,
-            "presence_penalty": 0.0,
-            "frequency_penalty": 0.0
-        },
-        "chatbot": {
-            "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
-            "max_conversation_history": 100,
-            "clear_history_on_exit": True
-        },
-        "logging": {
-            "enabled": True,
-            "level": "INFO",
-            "log_file": "chatbot.log"
-        }
-    }
-    return "Configuration reset to default values"
+    if _default_config:
+        _config = _default_config.copy()
+        return "Configuration reset to default values from default_config.yaml"
+    else:
+        return "Error: Default configuration not available"
+
+@mcp.tool()
+def load_defaults() -> str:
+    """Load default configuration from default_config.yaml."""
+    global _config
+    if _load_default_config():
+        _config = _default_config.copy()
+        return "Default configuration loaded from default_config.yaml"
+    else:
+        return "Error: Could not load default configuration"
 
 @mcp.tool()
 def list_config_keys(section: Optional[str] = None) -> str:
@@ -215,9 +210,30 @@ def calculate(operation: str, a: float, b: float) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+def _load_default_config():
+    """Load default configuration from default_config.yaml."""
+    global _default_config
+    try:
+        if Path("default_config.yaml").exists():
+            with open("default_config.yaml", 'r') as f:
+                loaded_config = yaml.safe_load(f)
+                if loaded_config:
+                    _default_config = loaded_config
+                    print("Loaded default configuration from default_config.yaml")
+                    return True
+                else:
+                    print("Warning: default_config.yaml is empty")
+                    return False
+        else:
+            print("Warning: default_config.yaml not found")
+            return False
+    except Exception as e:
+        print(f"Warning: Could not load default_config.yaml: {e}")
+        return False
+
 if __name__ == "__main__":
     # Load configuration from server's own config file
-    config_file = "server_config.yaml"
+    config_file = "config.yaml"
     _config_file_path = config_file
     
     if Path(config_file).exists():
@@ -229,77 +245,26 @@ if __name__ == "__main__":
                     _config_version = 1  # Start with version 1
                     print(f"Loaded server configuration from {config_file} (version {_config_version})")
                 else:
-                    print(f"Warning: Configuration file {config_file} is empty, using defaults")
-                    # Set default configuration
-                    _config = {
-                        "openai": {
-                            "model": "gpt-4o-mini",
-                            "temperature": 0.8,
-                            "top_p": 1.0,
-                            "max_tokens": 2000,
-                            "presence_penalty": 0.0,
-                            "frequency_penalty": 0.0
-                        },
-                        "chatbot": {
-                            "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
-                            "max_conversation_history": 100,
-                            "clear_history_on_exit": True
-                        },
-                        "logging": {
-                            "enabled": True,
-                            "level": "INFO",
-                            "log_file": "chatbot.log"
-                        }
-                    }
+                    print(f"Warning: Configuration file {config_file} is empty, loading defaults")
+                    if _load_default_config():
+                        _config = _default_config.copy()
+                    else:
+                        _config = {}
                     _config_version = 1
         except Exception as e:
             print(f"Warning: Could not load configuration from {config_file}: {e}")
-            print("Using default configuration")
-            # Set default configuration
-            _config = {
-                "openai": {
-                    "model": "gpt-4o-mini",
-                    "temperature": 0.8,
-                    "top_p": 1.0,
-                    "max_tokens": 2000,
-                    "presence_penalty": 0.0,
-                    "frequency_penalty": 0.0
-                },
-                "chatbot": {
-                    "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
-                    "max_conversation_history": 100,
-                    "clear_history_on_exit": True
-                },
-                "logging": {
-                    "enabled": True,
-                    "level": "INFO",
-                    "log_file": "chatbot.log"
-                }
-            }
+            print("Loading default configuration")
+            if _load_default_config():
+                _config = _default_config.copy()
+            else:
+                _config = {}
             _config_version = 1
     else:
-        print(f"No configuration file found at {config_file}, using defaults")
-        # Set default configuration
-        _config = {
-            "openai": {
-                "model": "gpt-4o-mini",
-                "temperature": 0.8,
-                "top_p": 1.0,
-                "max_tokens": 2000,
-                "presence_penalty": 0.0,
-                "frequency_penalty": 0.0
-            },
-            "chatbot": {
-                "system_prompt": "You are a sarcastic AI agent and you like to rhyme",
-                "max_conversation_history": 100,
-                "clear_history_on_exit": True
-            },
-            "logging": {
-                "enabled": True,
-                "level": "INFO",
-                "log_file": "chatbot.log"
-            }
-        }
+        print(f"No configuration file found at {config_file}, loading defaults")
+        if _load_default_config():
+            _config = _default_config.copy()
+        else:
+            _config = {}
         _config_version = 1
     
     # Start the config file watcher for event-driven updates
