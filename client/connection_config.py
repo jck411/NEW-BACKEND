@@ -81,4 +81,13 @@ class ConnectionConfig:
     
     def get_config_file_path(self) -> str:
         """Get the path to the configuration file."""
-        return str(Path(self.config_file).absolute()) 
+        return str(Path(self.config_file).absolute())
+    
+    def get_stt_config(self) -> Dict[str, Any]:
+        """Get STT configuration settings."""
+        return self.config.get('stt', {})
+    
+    def is_stt_enabled(self) -> bool:
+        """Check if STT is enabled."""
+        stt_config = self.get_stt_config()
+        return stt_config.get('enabled', False) 

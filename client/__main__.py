@@ -8,8 +8,11 @@ import argparse
 import asyncio
 import logging
 import sys
+import queue
+import threading
 
 from .chatbot import ChatBot
+from .chatbot_stt import ChatBotSTT
 
 
 def parse_args():
@@ -88,25 +91,99 @@ async def main():
         for tool in tools.tools:
             print(f"  - {tool.name}")
             
-        print("\n💬 Start chatting (Ctrl+C to exit):")
+        # Check if STT is enabled
+        stt_enabled = chatbot.connection_config.is_stt_enabled()
+        stt_instance = None
+        message_queue = queue.Queue()
         
-        # Chat loop
-        while True:
+        if stt_enabled:
             try:
-                user_input = input("\nYou: ").strip()
-                if user_input.lower() in ['exit', 'quit', 'bye']:
-                    print("👋 Goodbye!")
-                    break
-                if user_input:
-                    print("\n🤖 Assistant: ", end="", flush=True)
-                    async for chunk in chatbot.process_message(user_input):
-                        print(chunk, end="", flush=True)
-                    print()  # New line after response
-            except KeyboardInterrupt:
-                print("\n👋 Goodbye!")
-                break
+                stt_config = chatbot.connection_config.get_stt_config()
+                
+                def utterance_callback(utterance: str):
+                    """Handle complete utterances from STT."""
+                    message_queue.put(('stt', utterance))
+                
+                stt_instance = ChatBotSTT(stt_config, utterance_callback)
+                stt_instance.start()
+                print("🎤 Speech-to-Text enabled - speak into your microphone!")
+                print("💬 You can also type messages or say 'exit', 'quit', or 'bye' to stop")
             except Exception as e:
-                print(f"\n❌ Error: {e}")
+                print(f"⚠️  STT initialization failed: {e}")
+                print("💬 Continuing with text-only mode")
+                stt_enabled = False
+        else:
+            print("\n💬 Start chatting (type your messages, Ctrl+C to exit):")
+        
+        # Chat loop with STT integration
+        def keyboard_input_thread():
+            """Handle keyboard input in a separate thread."""
+            while True:
+                try:
+                    user_input = input().strip() if not stt_enabled else input("\nType (or speak): ").strip()
+                    if user_input:
+                        message_queue.put(('keyboard', user_input))
+                except (EOFError, KeyboardInterrupt):
+                    message_queue.put(('quit', None))
+                    break
+        
+        # Start keyboard input thread
+        input_thread = threading.Thread(target=keyboard_input_thread, daemon=True)
+        input_thread.start()
+        
+        try:
+            while True:
+                try:
+                    # Get next message (either from STT or keyboard)
+                    message_type, user_input = message_queue.get(timeout=0.1)
+                    
+                    if message_type == 'quit':
+                        print("\n👋 Goodbye!")
+                        break
+                    elif message_type in ['stt', 'keyboard']:
+                        if user_input.lower() in ['exit', 'quit', 'bye']:
+                            print("\n👋 Goodbye!")
+                            break
+                        
+                        if user_input:
+                            # Show user input (especially important for STT)
+                            if message_type == 'stt':
+                                print(f"\n🎤 You (speech): {user_input}")
+                            else:
+                                print(f"\n⌨️  You: {user_input}")
+                            
+                            print("🤖 Assistant: ", end="", flush=True)
+                            
+                            # Pause STT during response streaming if enabled
+                            if stt_instance:
+                                stt_instance.pause_for_response_streaming()
+                            
+                            try:
+                                async for chunk in chatbot.process_message(user_input):
+                                    print(chunk, end="", flush=True)
+                                print()  # New line after response
+                            finally:
+                                # Resume STT after response is complete
+                                if stt_instance:
+                                    stt_instance.resume_from_response_streaming()
+                                    
+                except queue.Empty:
+                    continue
+                except KeyboardInterrupt:
+                    print("\n👋 Goodbye!")
+                    break
+                except Exception as e:
+                    print(f"\n❌ Error: {e}")
+                    # Resume STT after error
+                    if stt_instance:
+                        stt_instance.resume_from_response_streaming()
+        finally:
+            # Cleanup STT
+            if stt_instance:
+                try:
+                    stt_instance.cleanup()
+                except Exception as e:
+                    print(f"Warning: STT cleanup error: {e}")
                 
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")
@@ -122,6 +199,13 @@ async def main():
                 pass
             except Exception as e:
                 print(f"Warning: Cleanup error: {e}")
+        
+        # Additional STT cleanup if it exists
+        if 'stt_instance' in locals() and stt_instance:
+            try:
+                stt_instance.cleanup()
+            except Exception as e:
+                print(f"Warning: STT cleanup error: {e}")
 
 
 if __name__ == "__main__":
