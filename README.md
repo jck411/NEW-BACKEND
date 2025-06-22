@@ -12,9 +12,10 @@ A Python client for interacting with Model Context Protocol (MCP) servers using 
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+
 - OpenAI API key
 - MCP server implementation
+- uv (Python package manager)
 
 ## Installation
 
@@ -24,13 +25,20 @@ git clone <your-repo-url>
 cd "NEW BACKEND"
 ```
 
-2. Install dependencies:
+2. Install uv (if not already installed):
 ```bash
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-3. Set up environment variables:
-Create a `.env` file in the parent directory with your OpenAI API key:
+3. Install dependencies using uv:
+```bash
+uv sync
+```
+
+This will create a virtual environment and install all dependencies automatically.
+
+4. Set up environment variables:
+Create a `.env` file in the project root directory with your OpenAI API key:
 ```
 OPENAI_API_KEY=your_openai_api_key_here
 ```
@@ -39,22 +47,22 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ### Running the Server
 
-You can run the MCP server in several ways:
+You can run the MCP server in several ways using uv:
 
 1. **Using the convenience script (recommended):**
 ```bash
-python run_server.py
+uv run python run_server.py
 ```
 
 2. **Directly from the server directory:**
 ```bash
 cd server
-python server.py
+uv run python server.py
 ```
 
 3. **From the root directory:**
 ```bash
-python server/server.py
+uv run python server/server.py
 ```
 
 ### Basic Client Usage
@@ -87,13 +95,13 @@ if __name__ == "__main__":
 
 ```bash
 # Connect to the configured server
-python -m client.cli
+uv run python -m client.cli
 
 # Connect with direct server command
-python -m client.cli --server-command "python server/server.py"
+uv run python -m client.cli --server-command "uv run python server/server.py"
 
 # Show server requirements
-python -m client.cli --show-requirements
+uv run python -m client.cli --show-requirements
 ```
 
 ### Configuration
@@ -109,6 +117,47 @@ The server configuration is managed through files in the `server/` directory:
 - `server/default_client_config.yaml` - Default configuration values
 
 For detailed server configuration options, see `server/SERVER_INTERFACE.md`.
+
+## Package Management with uv
+
+This project uses [uv](https://github.com/astral-sh/uv) for fast Python package management. Here are the key commands:
+
+### Common uv Commands
+
+```bash
+# Sync dependencies (install/update based on pyproject.toml)
+uv sync
+
+# Add a new dependency
+uv add package-name
+
+# Add a development dependency
+uv add --dev package-name
+
+# Remove a dependency
+uv remove package-name
+
+# Run Python with the project's virtual environment
+uv run python script.py
+
+# Run any command in the project environment
+uv run command
+
+# Show installed packages
+uv tree
+
+# Update all dependencies
+uv sync --upgrade
+```
+
+### Migration from pip
+
+If you were previously using pip, note the following changes:
+- `pip install -r requirements.txt` → `uv sync`
+- `pip install package` → `uv add package`
+- `python script.py` → `uv run python script.py` (when you want to use the project environment)
+- Dependencies are now managed in `pyproject.toml` instead of `requirements.txt`
+- The lock file `uv.lock` ensures reproducible builds (similar to `poetry.lock` or `Pipfile.lock`)
 
 ## Project Structure
 
@@ -127,10 +176,10 @@ NEW BACKEND/
 │   ├── server.py
 │   ├── dynamic_client_config.yaml
 │   ├── default_client_config.yaml
-│   ├── SERVER_INTERFACE.md
-│   └── requirements.txt
+│   └── SERVER_INTERFACE.md
 ├── run_server.py          # Convenience script to run server
-├── requirements.txt       # Combined Python dependencies
+├── pyproject.toml         # Project configuration and dependencies
+├── uv.lock               # Dependency lock file
 ├── .env                  # Environment variables (create this)
 ├── .gitignore           # Git ignore rules
 └── README.md            # This file

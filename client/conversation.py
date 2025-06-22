@@ -2,10 +2,14 @@ import json
 import logging
 from typing import Any, Dict, List, AsyncGenerator
 
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 from .session import MCPSession
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class ConversationManager:

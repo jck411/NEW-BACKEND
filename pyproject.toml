@@ -1,0 +1,45 @@
+[project]
+name = "chatbot-backend"
+version = "0.1.0"
+description = "A clean architecture backend with client and server components"
+requires-python = ">=3.10"
+dependencies = [
+    "nest-asyncio>=1.5.6",
+    "python-dotenv>=1.0.0",
+    "openai>=1.1.0",
+    "ipykernel>=6.0.0",
+    "mcp>=1.0.0",
+    "pyyaml>=6.0.1",
+    "watchdog>=3.0.0",
+    "fastmcp>=2.0.0",
+    "watchfiles>=0.21.0",
+    "aiofiles>=23.1.0",
+]
+
+[project.optional-dependencies]
+client = [
+    "nest-asyncio>=1.5.6",
+    "python-dotenv>=1.0.0",
+    "openai>=1.1.0",
+    "ipykernel>=6.0.0",
+]
+server = [
+    "nest-asyncio>=1.5.6",
+    "python-dotenv>=1.0.0",
+    "fastmcp>=2.0.0",
+    "openai>=1.1.0",
+    "ipykernel>=6.0.0",
+    "pyyaml>=6.0.1",
+    "watchfiles>=0.21.0",
+    "aiofiles>=23.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["client", "server"]
+
+[tool.uv]
+dev-dependencies = [] 
