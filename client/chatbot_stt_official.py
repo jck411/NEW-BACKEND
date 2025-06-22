@@ -198,8 +198,8 @@ class ChatBotSTTOfficial:
         if self.keepalive_task and not self.keepalive_task.done():
             self.keepalive_task.cancel()
             try:
-                await self.keepalive_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self.keepalive_task, timeout=1.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self.keepalive_task = None
 
@@ -224,18 +224,26 @@ class ChatBotSTTOfficial:
             self.is_running = False
             await self._stop_keepalive()
             
+            # Stop microphone first with error handling
             if self.microphone:
-                self.microphone.finish()
+                try:
+                    self.microphone.finish()
+                except Exception:
+                    pass  # Ignore microphone cleanup errors
                 self.microphone = None
                 
+            # Close connection gracefully with timeout
             if self.dg_connection:
-                await self.dg_connection.finish()
+                try:
+                    await asyncio.wait_for(self.dg_connection.finish(), timeout=2.0)
+                except (asyncio.TimeoutError, Exception):
+                    pass  # Ignore connection cleanup errors
                 self.dg_connection = None
                 
             self.logger.info("🛑 Live transcription finished")
             
         except Exception as e:
-            self.logger.error(f"Error finishing transcription: {e}")
+            self.logger.debug(f"Error finishing transcription (ignoring): {e}")  # Make this debug level
 
     # Public methods for integration with chatbot
     def pause_for_response_streaming(self):
@@ -271,26 +279,32 @@ class ChatBotSTTOfficial:
     def stop(self):
         """Stop the STT service."""
         if not self.is_running:
-            self.logger.warning("STT is not running")
-            return
+            return  # Silently return if already stopped
             
         self.logger.info("Stopping live transcription...")
         future = asyncio.run_coroutine_threadsafe(self.finish_transcription(), self.dg_loop)
         try:
-            future.result(timeout=5)  # Wait up to 5 seconds for stop
+            future.result(timeout=3)  # Shorter timeout for faster shutdown
         except Exception as e:
-            self.logger.error(f"Failed to stop STT: {e}")
+            self.logger.debug(f"Stop error (ignoring): {e}")  # Make this debug level
 
     def cleanup(self):
         """Clean up resources (like working testdeepgram.py)."""
+        if hasattr(self, '_cleanup_done') and self._cleanup_done:
+            return  # Prevent duplicate cleanup
+            
         self.logger.info("Cleaning up official STT...")
+        self._cleanup_done = True
         
         if self.is_running:
             self.stop()
             
         # Stop the event loop (like working testdeepgram.py)
         if hasattr(self, 'dg_loop') and self.dg_loop.is_running():
-            self.dg_loop.call_soon_threadsafe(self.dg_loop.stop)
+            try:
+                self.dg_loop.call_soon_threadsafe(self.dg_loop.stop)
+            except RuntimeError:
+                pass  # Loop might already be stopped
             if hasattr(self, 'dg_thread'):
                 self.dg_thread.join(timeout=2.0)
             

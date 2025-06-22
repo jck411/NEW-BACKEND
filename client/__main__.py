@@ -141,7 +141,9 @@ async def main():
                         print("\n👋 Goodbye!")
                         break
                     elif message_type in ['stt', 'keyboard']:
-                        if user_input.lower() in ['exit', 'quit', 'bye']:
+                        # Normalize input for quit commands (remove punctuation, lowercase)
+                        normalized_input = user_input.lower().strip().rstrip('.,!?;:')
+                        if normalized_input in ['exit', 'quit', 'bye']:
                             print("\n👋 Goodbye!")
                             break
                         
