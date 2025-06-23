@@ -12,7 +12,7 @@ import queue
 import threading
 
 from .chatbot import ChatBot
-from .chatbot_stt_official import ChatBotSTTOfficial
+from STT import DeepgramSTT
 
 
 def parse_args():
@@ -104,7 +104,7 @@ async def main():
                     """Handle complete utterances from STT."""
                     message_queue.put(('stt', utterance))
                 
-                stt_instance = ChatBotSTTOfficial(stt_config, utterance_callback)
+                stt_instance = DeepgramSTT(stt_config, utterance_callback)
                 stt_instance.start()
                 print("🎤 Speech-to-Text enabled - speak into your microphone!")
                 print("💬 You can also type messages or say 'exit', 'quit', or 'bye' to stop")

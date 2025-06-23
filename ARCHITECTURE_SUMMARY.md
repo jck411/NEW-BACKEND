@@ -86,9 +86,9 @@ class DeepgramSTT:
     - Resource cleanup
 ```
 
-**ChatBotSTTOfficial** (`client/chatbot_stt_official.py`):
+**DeepgramSTT** (`STT/deepgram_stt.py`):
 ```python
-class ChatBotSTTOfficial:
+class DeepgramSTT:
     - Chatbot-specific STT integration
     - KeepAlive during responses
     - Utterance callback handling
