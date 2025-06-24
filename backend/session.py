@@ -9,6 +9,14 @@ from pathlib import Path
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+from .exceptions import (
+    SessionError,
+    SessionNotInitializedError,
+    ServerConnectionError,
+    ToolExecutionError,
+    wrap_exception
+)
+
 
 class MCPSession:
     """Manages MCP server connection and tool operations for any compatible MCP server."""
@@ -78,12 +86,16 @@ class MCPSession:
             
         except Exception as e:
             self.logger.error(f"Failed to connect to MCP server {self.server_info['full_command']}: {e}")
-            raise RuntimeError(f"Could not connect to MCP server: {e}")
+            wrapped_error = wrap_exception(e, ServerConnectionError, "Could not connect to MCP server",
+                                         error_code="MCP_CONNECTION_FAILED",
+                                         context={"server_command": self.server_info['full_command']})
+            raise wrapped_error
     
     async def get_tools_for_openai(self) -> List[Dict[str, Any]]:
         """Get available tools from the MCP server in OpenAI format."""
         if self.session is None:
-            raise RuntimeError("Session is not initialized. Call connect() first.")
+            raise SessionNotInitializedError("Session is not initialized. Call connect() first.",
+                                           error_code="SESSION_NOT_INITIALIZED")
             
         tools_result = await self.session.list_tools()
         return [
@@ -101,7 +113,8 @@ class MCPSession:
     async def call_tool(self, name: str, arguments: Dict[str, Any]):
         """Call a tool on the MCP server."""
         if self.session is None:
-            raise RuntimeError("Session is not initialized")
+            raise SessionNotInitializedError("Session is not initialized",
+                                           error_code="SESSION_NOT_INITIALIZED")
         
         return await self.session.call_tool(name, arguments=arguments)
     

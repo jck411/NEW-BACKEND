@@ -1,0 +1,22 @@
+# Modern 2025 MCP server configuration
+server_path: /home/jack/NEW-BACKEND/server/server.py
+# Preferred execution methods (in order of preference):
+# 1. mcp run server/server.py
+# 2. python -m server.server (from project root)
+# 3. PYTHONPATH=. python server/server.py
+
+# Backend API Configuration
+backend:
+  host: "localhost"                # Backend host
+  port: 8000                       # Backend port
+  enable_cors: true                # Enable CORS for web frontends
+  max_connections: 100             # Maximum WebSocket connections
+
+# Speech-to-Text Configuration (used by frontends)
+stt:
+  enabled: false                   # Enable/disable STT functionality
+  api_key_env: "DEEPGRAM_API_KEY"  # Environment variable containing Deepgram API key
+  model: "nova-2"                  # Deepgram model to use
+  language: "en-US"                # Language for transcription
+  utterance_end_ms: 1000           # Milliseconds to wait before considering utterance ended
+  keepalive_interval: 3            # Seconds between keepalive messages during streaming responses

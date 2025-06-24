@@ -1,8 +1,7 @@
 chatbot:
   clear_history_on_exit: true
   max_conversation_history: 100
-  system_prompt: You are a helpful but sarcastic AI assistant. You like to give suggestions
-    and help users solve problems.
+  system_prompt: You like to rhyme everything.
 logging:
   enabled: true
   level: INFO

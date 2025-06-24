@@ -2,6 +2,13 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
+from .exceptions import (
+    ConfigurationError,
+    ServerIncompatibleError,
+    ConfigurationLoadError,
+    wrap_exception
+)
+
 
 class ServerConfig:
     """Configuration manager that gets all config from any MCP server that implements the config interface."""
@@ -44,9 +51,11 @@ class ServerConfig:
                     missing_tools.append(tool_name)
             
             if missing_tools:
-                raise RuntimeError(
+                raise ServerIncompatibleError(
                     f"Server is not compatible. Missing required tools: {missing_tools}. "
-                    f"Any compatible MCP server must implement: {list(self.REQUIRED_TOOLS.keys())}"
+                    f"Any compatible MCP server must implement: {list(self.REQUIRED_TOOLS.keys())}",
+                    error_code="SERVER_MISSING_TOOLS",
+                    context={"missing_tools": missing_tools, "required_tools": list(self.REQUIRED_TOOLS.keys())}
                 )
             
             # Load configuration from server
@@ -69,7 +78,9 @@ class ServerConfig:
                 
         except Exception as e:
             self.logger.error(f"Failed to load config from server: {e}")
-            raise
+            wrapped_error = wrap_exception(e, ConfigurationLoadError, "Failed to load configuration from server",
+                                         error_code="CONFIG_LOAD_FAILED")
+            raise wrapped_error
     
     async def _check_server_capabilities(self, session):
         """Check what configuration tools the server provides."""
@@ -89,7 +100,9 @@ class ServerConfig:
             
         except Exception as e:
             self.logger.error(f"Failed to check server capabilities: {e}")
-            raise
+            wrapped_error = wrap_exception(e, ConfigurationError, "Failed to check server capabilities",
+                                         error_code="SERVER_CAPABILITIES_CHECK_FAILED")
+            raise wrapped_error
     
     def _extract_tool_content(self, result) -> str:
         """Extract content from tool results."""

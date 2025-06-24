@@ -1,6 +1,7 @@
 import asyncio
 import json
 import yaml
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -11,7 +12,15 @@ import aiofiles.os
 from watchfiles import awatch
 
 from fastmcp import FastMCP
-from dynamic_tools import DynamicToolManager
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Modern 2025 approach: Use proper module structure
+# Run server with: python -m server.server (from project root)
+# Or: mcp run server/server.py (using MCP CLI)
+from server.dynamic_tools import DynamicToolManager
 
 # Create an MCP server
 mcp = FastMCP("config_aware_server")
@@ -19,7 +28,7 @@ mcp = FastMCP("config_aware_server")
 # Global configuration storage with proper type hints
 _config: Dict[str, Any] = {}
 _default_config: Dict[str, Any] = {}
-_config_file_path = Path(__file__).parent / "dynamic_client_config.yaml"
+_config_file_path = Path(__file__).parent / "dynamic_backend_config.yaml"
 _config_version = 0
 _config_watcher_task = None  # Asyncio task for watching config file
 _dynamic_tool_manager = None  # DynamicToolManager instance
@@ -35,18 +44,18 @@ async def _async_reload_config():
             if loaded_config:
                 _config = loaded_config
                 _config_version += 1
-                print(f"Configuration auto-reloaded (version {_config_version})")
+                logger.info(f"Configuration auto-reloaded (version {_config_version})")
                 
-                # 🔥 AUTO-UPDATE: Automatically refresh dynamic tools after config change
+                # AUTO-UPDATE: Automatically refresh dynamic tools after config change
                 if _dynamic_tool_manager:
                     try:
                         _dynamic_tool_manager.config = _config
                         await _dynamic_tool_manager.transform_tools_based_on_config()
-                        print("🚀 Dynamic tools auto-refreshed after config change")
+                        logger.info("Dynamic tools auto-refreshed after config change")
                     except Exception as e:
-                        print(f"Warning: Failed to auto-refresh dynamic tools: {e}")
+                        logger.warning(f"Failed to auto-refresh dynamic tools: {e}")
     except Exception as e:
-        print(f"Error auto-reloading configuration: {e}")
+        logger.error(f"Error auto-reloading configuration: {e}")
 
 async def _config_watcher():
     """Async watcher for config file changes using watchfiles."""
@@ -54,10 +63,10 @@ async def _config_watcher():
         async for changes in awatch(_config_file_path.parent):
             for change_type, path in changes:
                 if Path(path) == _config_file_path:
-                    print(f"Config file {change_type.name.lower()}: {path}")
+                    logger.debug(f"Config file {change_type.name.lower()}: {path}")
                     await _async_reload_config()
     except Exception as e:
-        print(f"Config watcher error: {e}")
+        logger.error(f"Config watcher error: {e}")
 
 def _start_config_watcher():
     """Start the asyncio-based config file watcher."""
@@ -65,7 +74,7 @@ def _start_config_watcher():
     if _config_watcher_task is None or _config_watcher_task.done():
         loop = asyncio.get_event_loop()
         _config_watcher_task = loop.create_task(_config_watcher())
-        print("Config file watcher started (asyncio-native)")
+        logger.info("Config file watcher started")
     return _config_watcher_task
 
 def _stop_config_watcher():
@@ -74,7 +83,7 @@ def _stop_config_watcher():
     if _config_watcher_task and not _config_watcher_task.done():
         _config_watcher_task.cancel()
         _config_watcher_task = None
-        print("Config file watcher stopped")
+        logger.info("Config file watcher stopped")
 
 @mcp.tool()
 async def get_config_version() -> str:
@@ -124,7 +133,7 @@ async def update_config(section: str, key: str, value: str) -> str:
     return f"Updated {section}.{key} from '{old_value}' to '{parsed_value}'{save_status}"
 
 @mcp.tool()
-async def save_config(filepath: str = "dynamic_client_config.yaml") -> str:
+async def save_config(filepath: str = "dynamic_backend_config.yaml") -> str:
     """Save current configuration to a YAML file."""
     try:
         # Use Path objects consistently and simplify path handling
@@ -136,7 +145,7 @@ async def save_config(filepath: str = "dynamic_client_config.yaml") -> str:
         return f"Error saving configuration: {e}"
 
 @mcp.tool()
-async def load_config(filepath: str = "dynamic_client_config.yaml") -> str:
+async def load_config(filepath: str = "dynamic_backend_config.yaml") -> str:
     """Load configuration from a YAML file."""
     global _config, _config_version
     try:
@@ -168,7 +177,7 @@ async def reset_config() -> str:
         try:
             async with aiofiles.open(_config_file_path, 'w') as f:
                 await f.write(yaml.dump(_config, default_flow_style=False, indent=2))
-            return f"Configuration reset to default values from default_client_config.yaml (version {_config_version})"
+            return f"Configuration reset to default values from default_backend_config.yaml (version {_config_version})"
         except Exception as e:
             return f"Configuration reset to defaults but could not save: {str(e)}"
     else:
@@ -176,12 +185,12 @@ async def reset_config() -> str:
 
 @mcp.tool()
 async def load_defaults() -> str:
-    """Load default configuration from default_client_config.yaml."""
+    """Load default configuration from default_backend_config.yaml."""
     global _config, _config_version
     if await _async_load_default_config():
         _config = _default_config.copy()
         _config_version += 1
-        return f"Default configuration loaded from default_client_config.yaml (version {_config_version})"
+        return f"Default configuration loaded from default_backend_config.yaml (version {_config_version})"
     else:
         return "Error: Could not load default configuration"
 
@@ -218,20 +227,20 @@ async def calculate(operation: str, a: float, b: float) -> str:
 # 🔥 REMOVED: refresh_dynamic_tools - now automatic via event-driven config updates
 
 async def _async_load_default_config() -> bool:
-    """Async load default configuration from default_client_config.yaml."""
+    """Async load default configuration from default_backend_config.yaml."""
     global _default_config
     try:
-        default_file = _config_file_path.parent / "default_client_config.yaml"
+        default_file = _config_file_path.parent / "default_backend_config.yaml"
         if await aiofiles.os.path.exists(default_file):
             async with aiofiles.open(default_file, 'r') as f:
                 content = await f.read()
             loaded = yaml.safe_load(content) or {}
             if loaded:
                 _default_config = loaded
-                print(f"Loaded default config from {default_file}")
+                logger.info(f"Loaded default config from {default_file}")
                 return True
     except Exception as e:
-        print(f"Warning loading defaults: {e}")
+        logger.warning(f"Warning loading defaults: {e}")
     return False
 
 # Sync fallback for startup
@@ -239,22 +248,22 @@ def _load_default_config() -> bool:
     """Sync load default configuration - used only during startup."""
     global _default_config
     try:
-        default_file = _config_file_path.parent / "default_client_config.yaml"
+        default_file = _config_file_path.parent / "default_backend_config.yaml"
         if default_file.exists():
             with open(default_file, 'r') as f:
                 loaded = yaml.safe_load(f) or {}
             if loaded:
                 _default_config = loaded
-                print(f"Loaded default config from {default_file}")
+                logger.info(f"Loaded default config from {default_file}")
                 return True
     except Exception as e:
-        print(f"Warning loading defaults: {e}")
+        logger.warning(f"Warning loading defaults: {e}")
     return False
 
 if __name__ == "__main__":
     # Load defaults first
     if not _load_default_config():
-        print("No default config found; starting with empty defaults")
+        logger.info("No default config found; starting with empty defaults")
 
     # Load dynamic config
     try:
@@ -263,17 +272,17 @@ if __name__ == "__main__":
             if loaded:
                 _config = loaded
                 _config_version = 1
-                print(f"Loaded config from {_config_file_path} (version {_config_version})")
+                logger.info(f"Loaded config from {_config_file_path} (version {_config_version})")
             else:
-                print("Config empty; using defaults")
+                logger.info("Config empty; using defaults")
                 _config = _default_config.copy()
                 _config_version = 1
         else:
-            print("No config file; using defaults")
+            logger.info("No config file; using defaults")
             _config = _default_config.copy()
             _config_version = 1
     except Exception as e:
-        print(f"Error loading config: {e}; using defaults")
+        logger.error(f"Error loading config: {e}; using defaults")
         _config = _default_config.copy()
         _config_version = 1
     
@@ -284,7 +293,7 @@ if __name__ == "__main__":
     _dynamic_tool_manager = DynamicToolManager(mcp, _config)
     loop = asyncio.get_event_loop()
     loop.create_task(_dynamic_tool_manager.transform_tools_based_on_config())
-    print("🚀 Dynamic tool initialization scheduled!")
+    logger.info("Dynamic tool initialization scheduled!")
     
     try:
         mcp.run()

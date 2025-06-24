@@ -7,6 +7,12 @@ from .config import ServerConfig
 from .session import MCPSession
 from .conversation import ConversationManager
 from .connection_config import ConnectionConfig
+from .exceptions import (
+    ConfigurationError,
+    ServerConnectionError,
+    MessageProcessingError,
+    wrap_exception
+)
 
 
 class ChatBot:
@@ -17,7 +23,7 @@ class ChatBot:
     but can work with any MCP server that implements the required configuration interface.
     """
     
-    def __init__(self, connection_config_file: str = "client/client_config.yaml"):
+    def __init__(self, connection_config_file: str = "backend/backend_config.yaml"):
         self.config = ServerConfig()
         self.mcp_session = MCPSession()
         self.conversation_manager = ConversationManager(self.mcp_session)
@@ -76,9 +82,10 @@ class ChatBot:
             # Initialize system message from server config
             system_prompt = self.config.chatbot_config.get('system_prompt', '')
             if not system_prompt:
-                raise RuntimeError(
+                raise ConfigurationError(
                     "Server configuration missing required 'chatbot.system_prompt'. "
-                    "The server must provide a complete chatbot configuration including system_prompt."
+                    "The server must provide a complete chatbot configuration including system_prompt.",
+                    error_code="MISSING_SYSTEM_PROMPT"
                 )
                 
             self.conversation_manager.set_system_message(system_prompt)
@@ -145,8 +152,9 @@ class ChatBot:
         """Process a user message maintaining conversation context."""
         # Ensure we're connected to a server
         if self.mcp_session.session is None:
-            raise RuntimeError(
-                "No server connection. Call connect_to_server() first with a compatible MCP server."
+            raise ServerConnectionError(
+                "No server connection. Call connect_to_server() first with a compatible MCP server.",
+                error_code="NO_SERVER_CONNECTION"
             )
             
         # Check if any configuration has changed and update if necessary

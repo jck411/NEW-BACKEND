@@ -5,8 +5,11 @@ Integrates with configuration system to create adaptive tools
 
 import asyncio
 import yaml
+import logging
 from typing import Dict, Any, List
 from fastmcp import FastMCP
+
+logger = logging.getLogger(__name__)
 
 
 class DynamicToolManager:
@@ -19,7 +22,7 @@ class DynamicToolManager:
         
     async def transform_tools_based_on_config(self):
         """Transform tools based on current configuration."""
-        print("🔄 Transforming tools based on configuration...")
+        logger.info("Transforming tools based on configuration...")
         
         # Update existing tools
         await self._update_configuration_tools()
@@ -27,7 +30,7 @@ class DynamicToolManager:
         await self._update_logging_tools()
         await self._update_chatbot_tools()
         
-        print(f"✅ Tool transformation complete. Dynamic tools created: {len(self.dynamic_tools)}")
+        logger.info(f"Tool transformation complete. Dynamic tools created: {len(self.dynamic_tools)}")
     
     async def _update_configuration_tools(self):
         """Update configuration management tools based on current config."""
@@ -63,7 +66,7 @@ class DynamicToolManager:
                 return f"Configuration section '{section}' not found"
         
         self.dynamic_tools[tool_name] = section_tool
-        print(f"📝 Created dynamic tool: {tool_name}")
+        logger.debug(f"Created dynamic tool: {tool_name}")
     
     async def _update_openai_tools(self):
         """Create OpenAI-specific tools if OpenAI section exists."""
@@ -96,7 +99,7 @@ class DynamicToolManager:
             return yaml.dump(capabilities, default_flow_style=False)
         
         self.dynamic_tools[tool_name] = model_capabilities
-        print("🤖 Created OpenAI-specific dynamic tools")
+        logger.debug("Created OpenAI-specific dynamic tools")
     
     async def _update_logging_tools(self):
         """Create logging-specific tools if logging section exists."""
@@ -124,7 +127,7 @@ class DynamicToolManager:
             return yaml.dump(analysis, default_flow_style=False)
         
         self.dynamic_tools[tool_name] = analyze_logging
-        print("📊 Created logging-specific dynamic tools")
+        logger.debug("Created logging-specific dynamic tools")
     
     async def _update_chatbot_tools(self):
         """Create chatbot-specific tools if chatbot section exists."""
@@ -157,7 +160,7 @@ class DynamicToolManager:
             return yaml.dump(analysis, default_flow_style=False)
         
         self.dynamic_tools[tool_name] = analyze_conversation
-        print("💬 Created chatbot-specific dynamic tools")
+        logger.debug("Created chatbot-specific dynamic tools")
     
     def _get_section_description(self, section: str) -> str:
         """Get description for a configuration section."""
@@ -206,6 +209,6 @@ class DynamicToolManager:
     
     async def regenerate_all_tools(self):
         """Update dynamic tools based on current configuration without recreating existing ones."""
-        print("🔄 Updating dynamic tools based on configuration...")
+        logger.info("Updating dynamic tools based on configuration...")
         # Don't clear existing tools - just update configuration and create any missing ones
         await self.transform_tools_based_on_config()
