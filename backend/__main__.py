@@ -68,7 +68,7 @@ def launch_backend_server():
         print()
         print("💡 Connect frontends from other terminals:")
         print("   uv run python frontends/terminal_frontend.py")
-        print("   uv run python frontends/kivy_frontend.py")
+    
         print()
         
         # Run the backend script

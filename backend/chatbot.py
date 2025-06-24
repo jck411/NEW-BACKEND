@@ -13,6 +13,7 @@ from .exceptions import (
     MessageProcessingError,
     wrap_exception
 )
+from .utils import extract_tool_content
 
 
 class ChatBot:
@@ -110,13 +111,13 @@ class ChatBot:
                 
             # Lightweight version check
             result = await self.mcp_session.call_tool("get_config_version", arguments={})
-            new_version = self._extract_tool_content(result).strip()
+            new_version = extract_tool_content(result).strip()
             
             # Only reload if version changed
             if not hasattr(self, '_config_version') or self._config_version != new_version:
                 # Get full config only when needed
                 result = await self.mcp_session.call_tool("get_config", arguments={})
-                content_text = self._extract_tool_content(result)
+                content_text = extract_tool_content(result)
                 server_config = json.loads(content_text)
                 
                 # Update local config directly
@@ -163,19 +164,7 @@ class ChatBot:
         async for chunk in self.conversation_manager.process_message_streaming(user_message, self.config):
             yield chunk
 
-    def _extract_tool_content(self, result) -> str:
-        """Extract content from tool results."""
-        content_text = ""
-        if result.content:
-            for content_item in result.content:
-                if hasattr(content_item, 'type'):
-                    if content_item.type == 'text' and hasattr(content_item, 'text'):
-                        content_text += content_item.text
-                    else:
-                        content_text += f"[{content_item.type} content]"
-                else:
-                    content_text += str(content_item)
-        return content_text
+
 
     def get_server_requirements(self) -> Dict[str, str]:
         """

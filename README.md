@@ -63,9 +63,6 @@ uv run python -m backend
 ```bash
 # Terminal frontend
 uv run python frontends/terminal_frontend.py
-
-# Kivy GUI frontend
-uv run python frontends/kivy_frontend.py
 ```
 
 ## Usage Examples
@@ -90,10 +87,7 @@ uv run python -m backend
 # Terminal 2: Connect terminal frontend
 uv run python frontends/terminal_frontend.py
 
-# Terminal 3: Connect GUI frontend
-uv run python frontends/kivy_frontend.py
-
-# Terminal 4: Connect another terminal frontend
+# Terminal 3: Connect another terminal frontend
 uv run python frontends/terminal_frontend.py
 ```
 
@@ -153,11 +147,7 @@ The MCP server configuration is managed in the `server/` directory. The default 
 - Real-time streaming responses
 - Cross-platform compatibility
 
-### Kivy Frontend
-- Modern GUI interface
-- Real-time chat with streaming
-- Clean, responsive design
-- Desktop application
+
 
 ## WebSocket Protocol
 
@@ -252,8 +242,7 @@ NEW-BACKEND/
 │   ├── backend_config.yaml # Backend configuration file
 │   └── __main__.py        # Backend server entry point
 ├── frontends/             # Standalone frontend applications
-│   ├── terminal_frontend.py # Complete terminal interface
-│   └── kivy_frontend.py   # Kivy GUI placeholder
+│   └── terminal_frontend.py # Complete terminal interface
 ├── server/                # MCP server implementation
 │   ├── server.py          # Main MCP server
 │   └── *.yaml             # Server configuration files

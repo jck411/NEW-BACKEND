@@ -11,6 +11,7 @@ from .exceptions import (
     ResourceNotFoundError,
     wrap_exception
 )
+from .utils import log_and_wrap_error
 
 
 class ConnectionConfig:
@@ -37,10 +38,12 @@ class ConnectionConfig:
                 self.config = yaml.safe_load(f) or {}
             self.logger.info(f"Loaded connection config from {self.config_file}")
         except Exception as e:
-            self.logger.error(f"Failed to load connection config: {e}")
-            wrapped_error = wrap_exception(e, ConfigurationLoadError, "Failed to load connection configuration",
-                                         error_code="CONFIG_LOAD_FAILED",
-                                         context={"config_file": self.config_file})
+            wrapped_error = log_and_wrap_error(
+                e, ConfigurationLoadError, "Failed to load connection configuration",
+                error_code="CONFIG_LOAD_FAILED",
+                context={"config_file": self.config_file},
+                logger=self.logger
+            )
             raise wrapped_error
     
     def get_server_command(self) -> List[str]:

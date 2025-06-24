@@ -81,10 +81,7 @@ python frontends/terminal_frontend.py
 # or with uv:
 uv run python frontends/terminal_frontend.py
 
-# Kivy frontend  
-python frontends/kivy_frontend.py
-# or with uv: 
-uv run python frontends/kivy_frontend.py
+# Additional frontends can be developed following the same WebSocket protocol
 ```
 
 ## WebSocket Protocol

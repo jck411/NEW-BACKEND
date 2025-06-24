@@ -10,6 +10,7 @@ from typing import Callable
 from dotenv import load_dotenv
 
 from backend.exceptions import DeepgramSTTError, STTError, wrap_exception
+from backend.utils import log_and_wrap_error
 from .handlers import STTEventHandlers
 from .connection import DeepgramConnectionManager
 from .keepalive import KeepAliveManager
@@ -55,9 +56,10 @@ class DeepgramSTT:
             self.logger.info("🎤 Deepgram live transcription started (modular)")
             
         except Exception as e:
-            self.logger.error(f"Error starting live transcription: {e}")
-            wrapped_error = wrap_exception(e, DeepgramSTTError, "Failed to start transcription",
-                                         error_code="STT_START_FAILED")
+            wrapped_error = log_and_wrap_error(
+                e, DeepgramSTTError, "Failed to start transcription",
+                error_code="STT_START_FAILED", logger=self.logger
+            )
             raise wrapped_error
 
     async def finish_transcription(self):
@@ -118,8 +120,10 @@ class DeepgramSTT:
         try:
             future.result(timeout=10)  # Wait up to 10 seconds for start
         except Exception as e:
-            wrapped_error = wrap_exception(e, DeepgramSTTError, "Failed to start STT service",
-                                         error_code="STT_SERVICE_START_FAILED")
+            wrapped_error = log_and_wrap_error(
+                e, DeepgramSTTError, "Failed to start STT service",
+                error_code="STT_SERVICE_START_FAILED", logger=self.logger
+            )
             raise wrapped_error
 
     def stop(self):

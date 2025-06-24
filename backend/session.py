@@ -16,6 +16,7 @@ from .exceptions import (
     ToolExecutionError,
     wrap_exception
 )
+from .utils import handle_connection_errors, log_and_wrap_error
 
 
 class MCPSession:
@@ -85,10 +86,12 @@ class MCPSession:
             return tools_result
             
         except Exception as e:
-            self.logger.error(f"Failed to connect to MCP server {self.server_info['full_command']}: {e}")
-            wrapped_error = wrap_exception(e, ServerConnectionError, "Could not connect to MCP server",
-                                         error_code="MCP_CONNECTION_FAILED",
-                                         context={"server_command": self.server_info['full_command']})
+            wrapped_error = log_and_wrap_error(
+                e, ServerConnectionError, "Could not connect to MCP server",
+                error_code="MCP_CONNECTION_FAILED",
+                context={"server_command": self.server_info['full_command']},
+                logger=self.logger
+            )
             raise wrapped_error
     
     async def get_tools_for_openai(self) -> List[Dict[str, Any]]:

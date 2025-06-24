@@ -1,7 +1,6 @@
 """
 Backend settings configuration
 """
-import os
 from typing import List
 from pydantic_settings import BaseSettings
 from backend.connection_config import ConnectionConfig

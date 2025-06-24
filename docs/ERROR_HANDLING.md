@@ -237,4 +237,4 @@ def test_configuration_error():
 
 ## Examples
 
-See `examples/error_handling_demo.py` for comprehensive examples of the error handling system in action. 
+The error handling system is demonstrated throughout the codebase with comprehensive examples in all modules. 

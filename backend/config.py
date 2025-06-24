@@ -8,6 +8,7 @@ from .exceptions import (
     ConfigurationLoadError,
     wrap_exception
 )
+from .utils import extract_tool_content, handle_config_errors, log_and_wrap_error, handle_errors
 
 
 class ServerConfig:
@@ -38,49 +39,43 @@ class ServerConfig:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
     
+    @handle_config_errors("Failed to load configuration from server", "CONFIG_LOAD_FAILED")
     async def load_from_server(self, session):
         """Load configuration from any compatible MCP server."""
-        try:
-            # First, check what tools the server provides
-            await self._check_server_capabilities(session)
-            
-            # Ensure required tools are available
-            missing_tools = []
-            for tool_name in self.REQUIRED_TOOLS:
-                if not self._server_capabilities.get(tool_name, False):
-                    missing_tools.append(tool_name)
-            
-            if missing_tools:
-                raise ServerIncompatibleError(
-                    f"Server is not compatible. Missing required tools: {missing_tools}. "
-                    f"Any compatible MCP server must implement: {list(self.REQUIRED_TOOLS.keys())}",
-                    error_code="SERVER_MISSING_TOOLS",
-                    context={"missing_tools": missing_tools, "required_tools": list(self.REQUIRED_TOOLS.keys())}
-                )
-            
-            # Load configuration from server
-            result = await session.call_tool("get_config", arguments={})
-            content_text = self._extract_tool_content(result)
-            self.config = json.loads(content_text)
-            
-            # Update logging configuration
-            if 'logging' in self.config and self.config['logging']['enabled']:
-                log_level = getattr(logging, self.config['logging']['level'].upper())
-                logging.getLogger().setLevel(log_level)
-            
-            self.logger.info("Configuration loaded from server")
-            
-            # Log server capabilities for debugging
-            available_optional = [tool for tool, available in self._server_capabilities.items() 
-                                if available and tool in self.OPTIONAL_TOOLS]
-            if available_optional:
-                self.logger.info(f"Server provides optional tools: {available_optional}")
-                
-        except Exception as e:
-            self.logger.error(f"Failed to load config from server: {e}")
-            wrapped_error = wrap_exception(e, ConfigurationLoadError, "Failed to load configuration from server",
-                                         error_code="CONFIG_LOAD_FAILED")
-            raise wrapped_error
+        # First, check what tools the server provides
+        await self._check_server_capabilities(session)
+        
+        # Ensure required tools are available
+        missing_tools = []
+        for tool_name in self.REQUIRED_TOOLS:
+            if not self._server_capabilities.get(tool_name, False):
+                missing_tools.append(tool_name)
+        
+        if missing_tools:
+            raise ServerIncompatibleError(
+                f"Server is not compatible. Missing required tools: {missing_tools}. "
+                f"Any compatible MCP server must implement: {list(self.REQUIRED_TOOLS.keys())}",
+                error_code="SERVER_MISSING_TOOLS",
+                context={"missing_tools": missing_tools, "required_tools": list(self.REQUIRED_TOOLS.keys())}
+            )
+        
+        # Load configuration from server
+        result = await session.call_tool("get_config", arguments={})
+        content_text = extract_tool_content(result)
+        self.config = json.loads(content_text)
+        
+        # Update logging configuration
+        if 'logging' in self.config and self.config['logging']['enabled']:
+            log_level = getattr(logging, self.config['logging']['level'].upper())
+            logging.getLogger().setLevel(log_level)
+        
+        self.logger.info("Configuration loaded from server")
+        
+        # Log server capabilities for debugging
+        available_optional = [tool for tool, available in self._server_capabilities.items() 
+                            if available and tool in self.OPTIONAL_TOOLS]
+        if available_optional:
+            self.logger.info(f"Server provides optional tools: {available_optional}")
     
     async def _check_server_capabilities(self, session):
         """Check what configuration tools the server provides."""
@@ -99,24 +94,13 @@ class ServerConfig:
             self.logger.debug(f"Server capabilities: {self._server_capabilities}")
             
         except Exception as e:
-            self.logger.error(f"Failed to check server capabilities: {e}")
-            wrapped_error = wrap_exception(e, ConfigurationError, "Failed to check server capabilities",
-                                         error_code="SERVER_CAPABILITIES_CHECK_FAILED")
+            wrapped_error = log_and_wrap_error(
+                e, ConfigurationError, "Failed to check server capabilities",
+                error_code="SERVER_CAPABILITIES_CHECK_FAILED", logger=self.logger
+            )
             raise wrapped_error
     
-    def _extract_tool_content(self, result) -> str:
-        """Extract content from tool results."""
-        content_text = ""
-        if result.content:
-            for content_item in result.content:
-                if hasattr(content_item, 'type'):
-                    if content_item.type == 'text' and hasattr(content_item, 'text'):
-                        content_text += content_item.text
-                    else:
-                        content_text += f"[{content_item.type} content]"
-                else:
-                    content_text += str(content_item)
-        return content_text
+
 
     def has_server_capability(self, tool_name: str) -> bool:
         """Check if the server supports a specific configuration tool."""

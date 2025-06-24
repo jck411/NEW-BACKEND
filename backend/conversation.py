@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 from .session import MCPSession
+from .utils import extract_tool_content
 
 # Load environment variables from .env file
 load_dotenv()
@@ -144,7 +145,7 @@ class ConversationManager:
                     tool_call['function']['name'],
                     arguments=arguments,
                 )
-                content_text = self._extract_tool_content(result)
+                content_text = extract_tool_content(result)
                 # Add tool response to conversation
                 self.conversation_history.append({
                     "role": "tool",
@@ -196,19 +197,7 @@ class ConversationManager:
         # Add summary to conversation history
         self.conversation_history.append({"role": "assistant", "content": summary_content})
     
-    def _extract_tool_content(self, result) -> str:
-        """Extract content from tool results."""
-        content_text = ""
-        if result.content:
-            for content_item in result.content:
-                if hasattr(content_item, 'type'):
-                    if content_item.type == 'text' and hasattr(content_item, 'text'):
-                        content_text += content_item.text
-                    else:
-                        content_text += f"[{content_item.type} content]"
-                else:
-                    content_text += str(content_item)
-        return content_text
+
     
     def clear_history(self):
         """Clear conversation history."""

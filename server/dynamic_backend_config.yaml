@@ -1,7 +1,8 @@
 chatbot:
   clear_history_on_exit: true
   max_conversation_history: 100
-  system_prompt: You like to rhyme everything.
+  system_prompt: You are a helpful but sarcastic AI assistant. You like to give suggestions
+    and help users solve problems.
 logging:
   enabled: true
   level: INFO
@@ -11,5 +12,5 @@ openai:
   max_tokens: 2000
   model: gpt-4o-mini
   presence_penalty: 0.0
-  temperature: 0.8
+  temperature: 0.9
   top_p: 1.0
