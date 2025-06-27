@@ -1,14 +1,12 @@
-"""
-Health and configuration endpoints
+"""Health and configuration endpoints
 Following 2025 best practices for API routing
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any
 
-from backend import ChatBot
-from api.dependencies import get_chatbot_status, get_chatbot
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.dependencies import get_chatbot, get_chatbot_status, get_connection_manager
 from api.services.connection_manager import ConnectionManager
-from api.dependencies import get_connection_manager
+from backend import ChatBot
 
 router = APIRouter()
 
@@ -27,7 +25,7 @@ async def health_check(
     try:
         status = get_chatbot_status()
         is_ready = status.get("mcp_connected", False)
-        
+
         return {
             "status": "healthy" if is_ready else "not_ready",
             "chatbot_ready": is_ready,
@@ -50,4 +48,4 @@ async def get_config(chatbot: ChatBot = Depends(get_chatbot)):
         }
         return {"config": config}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))

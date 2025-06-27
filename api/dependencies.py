@@ -1,13 +1,13 @@
-"""
-Dependency injection and global state management
+"""Dependency injection and global state management
 Following 2025 best practices for FastAPI dependency injection
 """
 import logging
-from typing import Dict, Any
+from typing import Any
 
 from fastapi import HTTPException
-from backend import ChatBot
+
 from api.services.connection_manager import ConnectionManager
+from backend import ChatBot
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def get_chatbot() -> ChatBot:
     """Dependency provider for ChatBot instance"""
     if _chatbot is None:
         raise HTTPException(
-            status_code=503, 
+            status_code=503,
             detail="ChatBot not initialized. Please restart the backend."
         )
     return _chatbot
@@ -31,11 +31,11 @@ def get_connection_manager() -> ConnectionManager:
     return _connection_manager
 
 
-def get_chatbot_status() -> Dict[str, Any]:
+def get_chatbot_status() -> dict[str, Any]:
     """Get chatbot status for health checks"""
     if _chatbot is None:
         return {"status": "not_initialized"}
-    
+
     return {
         "initialized": True,
         "mcp_connected": _chatbot.mcp_session.session is not None,
@@ -62,4 +62,4 @@ def _set_chatbot(chatbot: ChatBot) -> None:
 
 def _get_chatbot_internal() -> ChatBot:
     """Internal function to get chatbot instance (can be None)"""
-    return _chatbot 
+    return _chatbot

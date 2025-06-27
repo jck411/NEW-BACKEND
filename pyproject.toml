@@ -2,49 +2,51 @@
 name = "chatbot-backend"
 version = "0.1.0"
 description = "A clean architecture backend with client and server components"
-requires-python = ">=3.10"
+requires-python = "==3.13.0"
 dependencies = [
-    "nest-asyncio>=1.5.6",
-    "python-dotenv>=1.0.0",
-    "openai>=1.1.0",
-    "mcp>=1.0.0",
-    "pyyaml>=6.0.1",
-    "fastmcp>=2.0.0",
-    "watchfiles>=0.21.0",
-    "aiofiles>=23.1.0",
-    "deepgram-sdk>=3.0.0",
-    "pyaudio>=0.2.11",
+    "nest-asyncio~=1.6.0",
+    "python-dotenv~=1.1.0",
+    "openai~=1.90.0",
+    "mcp~=1.9.4",
+    "pyyaml~=6.0.2",
+    "fastmcp~=2.8.1",
+    "watchfiles~=1.1.0",
+    "aiofiles~=24.1.0",
+    "deepgram-sdk~=4.3.1",
+    "pyaudio~=0.2.14",
     # FastAPI backend dependencies
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "websockets>=12.0",
+    "fastapi~=0.115.13",
+    "uvicorn[standard]~=0.34.3",
+    "pydantic~=2.11.7",
+    "pydantic-settings~=2.10.0",
+    "websockets~=15.0.1",
+    # Structured logging
+    "structlog~=25.4.0",
 ]
 
 [project.optional-dependencies]
 client = [
-    "nest-asyncio>=1.5.6",
-    "python-dotenv>=1.0.0",
-    "openai>=1.1.0",
-    "deepgram-sdk>=3.0.0",
-    "pyaudio>=0.2.11",
+    "nest-asyncio~=1.6.0",
+    "python-dotenv~=1.1.0",
+    "openai~=1.90.0",
+    "deepgram-sdk~=4.3.1",
+    "pyaudio~=0.2.14",
 ]
 server = [
-    "nest-asyncio>=1.5.6",
-    "python-dotenv>=1.0.0",
-    "fastmcp>=2.0.0",
-    "openai>=1.1.0",
-    "pyyaml>=6.0.1",
-    "watchfiles>=0.21.0",
-    "aiofiles>=23.1.0",
+    "nest-asyncio~=1.6.0",
+    "python-dotenv~=1.1.0",
+    "fastmcp~=2.8.1",
+    "openai~=1.90.0",
+    "pyyaml~=6.0.2",
+    "watchfiles~=1.1.0",
+    "aiofiles~=24.1.0",
 ]
 api = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "websockets>=12.0",
+    "fastapi~=0.115.13",
+    "uvicorn[standard]~=0.34.3",
+    "pydantic~=2.11.7",
+    "pydantic-settings~=2.10.0",
+    "websockets~=15.0.1",
 ]
 
 [build-system]
@@ -55,4 +57,105 @@ build-backend = "hatchling.build"
 packages = ["backend", "server", "api"]
 
 [tool.uv]
-dev-dependencies = [] 
+dev-dependencies = [
+    "pytest~=8.4.1",
+    "pytest-asyncio~=1.0.0",
+    "pytest-cov~=6.2.1",
+    "ruff~=0.12.1",
+    "mypy~=1.16.1",
+    "mutmut~=3.3.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=api",
+    "--cov=backend", 
+    "--cov=server",
+    "--cov=STT",
+    "--cov-branch",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml",
+    "--cov-fail-under=70",
+]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+source = ["api", "backend", "server", "STT"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+select = ["ALL"]
+ignore = [
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method - can enable later
+    "D103",    # Missing docstring in public function - can enable later
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "COM812",  # Trailing comma missing
+    "ISC001",  # Implicit string concatenation
+]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["S101", "D103", "ANN201", "ANN001"]  # Allow assert, missing docstrings in tests
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.mutmut]
+paths_to_mutate = "api/,backend/,server/,STT/"
+backup = false
+runner = "pytest"
+tests_dir = "tests/" 

@@ -1,36 +1,29 @@
 import asyncio
 import logging
-import os
-import sys
 from contextlib import AsyncExitStack
-from typing import Any, Dict, List, Optional, Union
-from pathlib import Path
+from typing import Any
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from .exceptions import (
-    SessionError,
-    SessionNotInitializedError,
     ServerConnectionError,
-    ToolExecutionError,
-    wrap_exception
+    SessionNotInitializedError,
 )
-from .utils import handle_connection_errors, log_and_wrap_error
+from .utils import log_and_wrap_error
 
 
 class MCPSession:
     """Manages MCP server connection and tool operations for any compatible MCP server."""
-    
+
     def __init__(self):
-        self.session: Optional[ClientSession] = None
+        self.session: ClientSession | None = None
         self.exit_stack = AsyncExitStack()
         self.logger = logging.getLogger(__name__)
-        self.server_info: Dict[str, Any] = {}
-    
-    async def connect(self, server_command: Union[str, List[str]], **server_params) -> Any:
-        """
-        Connect to any MCP server.
+        self.server_info: dict[str, Any] = {}
+
+    async def connect(self, server_command: str | list[str], **server_params) -> Any:
+        """Connect to any MCP server.
         
         Args:
             server_command: Full command as string or list of args to run the server
@@ -41,7 +34,6 @@ class MCPSession:
             await session.connect(server_command=["python", "/path/to/any/server.py"])
             await session.connect(server_command="node /path/to/server.js")
         """
-        
         if isinstance(server_command, str):
             # Parse string command into list
             import shlex
@@ -55,13 +47,13 @@ class MCPSession:
 
         # Store server info for debugging
         self.server_info = {
-            'command': command,
-            'args': args,
-            'full_command': [command] + args
+            "command": command,
+            "args": args,
+            "full_command": [command] + args
         }
-        
+
         self.logger.info(f"Connecting to MCP server: {' '.join(self.server_info['full_command'])}")
-        
+
         try:
             server_params_obj = StdioServerParameters(
                 command=command,
@@ -72,34 +64,34 @@ class MCPSession:
             stdio_transport = await self.exit_stack.enter_async_context(
                 stdio_client(server_params_obj)
             )
-            
+
             self.session = await self.exit_stack.enter_async_context(
                 ClientSession(stdio_transport[0], stdio_transport[1])
             )
 
             await self.session.initialize()
-            
+
             # Get server info for logging
             tools_result = await self.session.list_tools()
             self.logger.info(f"Successfully connected to MCP server with {len(tools_result.tools)} tools")
-            
+
             return tools_result
-            
+
         except Exception as e:
             wrapped_error = log_and_wrap_error(
                 e, ServerConnectionError, "Could not connect to MCP server",
                 error_code="MCP_CONNECTION_FAILED",
-                context={"server_command": self.server_info['full_command']},
+                context={"server_command": self.server_info["full_command"]},
                 logger=self.logger
             )
             raise wrapped_error
-    
-    async def get_tools_for_openai(self) -> List[Dict[str, Any]]:
+
+    async def get_tools_for_openai(self) -> list[dict[str, Any]]:
         """Get available tools from the MCP server in OpenAI format."""
         if self.session is None:
             raise SessionNotInitializedError("Session is not initialized. Call connect() first.",
                                            error_code="SESSION_NOT_INITIALIZED")
-            
+
         tools_result = await self.session.list_tools()
         return [
             {
@@ -112,22 +104,22 @@ class MCPSession:
             }
             for tool in tools_result.tools
         ]
-    
-    async def call_tool(self, name: str, arguments: Dict[str, Any]):
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]):
         """Call a tool on the MCP server."""
         if self.session is None:
             raise SessionNotInitializedError("Session is not initialized",
                                            error_code="SESSION_NOT_INITIALIZED")
-        
+
         return await self.session.call_tool(name, arguments=arguments)
-    
-    def get_server_info(self) -> Dict[str, Any]:
+
+    def get_server_info(self) -> dict[str, Any]:
         """Get information about the connected server."""
         return self.server_info.copy()
-    
+
     async def cleanup(self):
         """Clean up session resources."""
-        if self.server_info.get('command'):
+        if self.server_info.get("command"):
             self.logger.info(f"Cleaning up connection to: {' '.join(self.server_info['full_command'])}")
         try:
             await self.exit_stack.aclose()
@@ -135,4 +127,4 @@ class MCPSession:
             # Handle graceful shutdown when interrupted
             pass
         except Exception as e:
-            self.logger.warning(f"Error during session cleanup: {e}") 
+            self.logger.warning(f"Error during session cleanup: {e}")

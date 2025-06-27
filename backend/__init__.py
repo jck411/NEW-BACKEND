@@ -1,5 +1,4 @@
-"""
-ChatBot Backend Package
+"""ChatBot Backend Package
 
 A server-agnostic chatbot backend that connects to any compatible MCP server 
 and integrates with OpenAI for conversational AI capabilities.
@@ -69,114 +68,105 @@ Following 2025 best practices with clean architecture and proper exception handl
 
 from .chatbot import ChatBot
 from .config import ServerConfig
-from .session import MCPSession
-from .conversation import ConversationManager
 from .connection_config import ConnectionConfig
+from .conversation import ConversationManager
 
 # Export exception hierarchy for easy access
 from .exceptions import (
     # Base exception
     ChatBotBaseException,
-    
+    ChatBotUnavailableError,
     # Configuration errors
     ConfigurationError,
-    ConfigurationValidationError,
-    ConfigurationMissingError,
     ConfigurationLoadError,
-    ServerIncompatibleError,
-    
+    ConfigurationMissingError,
+    ConfigurationValidationError,
     # Connection errors
     ConnectionError,
-    ServerConnectionError,
-    WebSocketConnectionError,
-    STTConnectionError,
-    
-    # Session errors
-    SessionError,
-    SessionNotInitializedError,
-    SessionInvalidStateError,
-    ToolExecutionError,
-    
+    ConversationError,
+    DeepgramError,
+    DeepgramSTTError,
+    # External service errors
+    ExternalServiceError,
     # Message processing errors
     MessageError,
-    MessageValidationError,
     MessageProcessingError,
-    ConversationError,
-    
-    # WebSocket errors
-    WebSocketError,
-    WebSocketMessageError,
-    WebSocketClientError,
-    ChatBotUnavailableError,
-    
+    MessageValidationError,
+    OpenAIError,
+    ResourceCleanupError,
+    # Resource management errors
+    ResourceError,
+    ResourceExhaustionError,
+    ResourceNotFoundError,
+    ServerConnectionError,
+    ServerIncompatibleError,
+    # Session errors
+    SessionError,
+    SessionInvalidStateError,
+    SessionNotInitializedError,
+    STTConfigurationError,
+    STTConnectionError,
     # STT errors
     STTError,
     STTInitializationError,
-    STTConfigurationError,
     STTServiceError,
-    DeepgramSTTError,
-    
-    # Resource management errors
-    ResourceError,
-    ResourceNotFoundError,
-    ResourceCleanupError,
-    ResourceExhaustionError,
-    
-    # External service errors
-    ExternalServiceError,
-    OpenAIError,
-    DeepgramError,
-    
+    ToolExecutionError,
+    WebSocketClientError,
+    WebSocketConnectionError,
+    # WebSocket errors
+    WebSocketError,
+    WebSocketMessageError,
+    get_exception_for_domain,
     # Utility functions
     wrap_exception,
-    get_exception_for_domain,
 )
+from .session import MCPSession
 
 __all__ = [
     # Main classes
-    'ChatBot',
-    'ServerConfig',
-    'MCPSession',
-    'ConversationManager',
-    'ConnectionConfig',
-    
+    "ChatBot",
+    "ServerConfig",
+    "MCPSession",
+    "ConversationManager",
+    "ConnectionConfig",
+
     # Exception hierarchy
-    'ChatBotBaseException',
-    'ConfigurationError',
-    'ConfigurationValidationError', 
-    'ConfigurationMissingError',
-    'ConfigurationLoadError',
-    'ServerIncompatibleError',
-    'ConnectionError',
-    'ServerConnectionError',
-    'WebSocketConnectionError',
-    'STTConnectionError',
-    'SessionError',
-    'SessionNotInitializedError',
-    'SessionInvalidStateError',
-    'ToolExecutionError',
-    'MessageError',
-    'MessageValidationError',
-    'MessageProcessingError',
-    'ConversationError',
-    'WebSocketError',
-    'WebSocketMessageError',
-    'WebSocketClientError',
-    'ChatBotUnavailableError',
-    'STTError',
-    'STTInitializationError',
-    'STTConfigurationError',
-    'STTServiceError',
-    'DeepgramSTTError',
-    'ResourceError',
-    'ResourceNotFoundError',
-    'ResourceCleanupError',
-    'ResourceExhaustionError',
-    'ExternalServiceError',
-    'OpenAIError',
-    'DeepgramError',
-    'wrap_exception',
-    'get_exception_for_domain',
+    "ChatBotBaseException",
+    "ConfigurationError",
+    "ConfigurationValidationError",
+    "ConfigurationMissingError",
+    "ConfigurationLoadError",
+    "ServerIncompatibleError",
+    "ConnectionError",
+    "ServerConnectionError",
+    "WebSocketConnectionError",
+    "STTConnectionError",
+    "SessionError",
+    "SessionNotInitializedError",
+    "SessionInvalidStateError",
+    "ToolExecutionError",
+    "MessageError",
+    "MessageValidationError",
+    "MessageProcessingError",
+    "ConversationError",
+    "WebSocketError",
+    "WebSocketMessageError",
+    "WebSocketClientError",
+    "ChatBotUnavailableError",
+    "STTError",
+    "STTInitializationError",
+    "STTConfigurationError",
+    "STTServiceError",
+    "DeepgramSTTError",
+    "ResourceError",
+    "ResourceNotFoundError",
+    "ResourceCleanupError",
+    "ResourceExhaustionError",
+    "ExternalServiceError",
+    "OpenAIError",
+    "DeepgramError",
+    "wrap_exception",
+    "get_exception_for_domain",
 ]
 
-__version__ = '1.0.0' 
+__version__ = "1.0.0"

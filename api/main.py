@@ -1,24 +1,27 @@
-"""
-FastAPI ChatBot Backend - Main Application
+"""FastAPI ChatBot Backend - Main Application
 Refactored following 2025 best practices with proper separation of concerns
 """
-import logging
-from fastapi import FastAPI, WebSocket, Depends
+from fastapi import Depends, FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.config.logging import configure_structured_logging, get_logger
 from api.config.settings import get_settings
+from api.dependencies import get_connection_manager
+from api.handlers.websocket_handlers import handle_test_websocket, handle_websocket_connection
 from api.lifecycle import lifespan
 from api.routers.health import router as health_router
-from api.handlers.websocket_handlers import handle_websocket_connection, handle_test_websocket
+from api.routers.metrics import router as metrics_router
 from api.services.connection_manager import ConnectionManager
-from api.dependencies import get_connection_manager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure structured logging
+settings = get_settings()
+configure_structured_logging(
+    level=settings.log_level,
+    format_json=settings.log_format_json
+)
+logger = get_logger(__name__)
 
 # Create FastAPI app with lifespan management
-settings = get_settings()
 app = FastAPI(
     title="ChatBot Backend API",
     description="Frontend-agnostic ChatBot backend with WebSocket support",
@@ -37,6 +40,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router)
+app.include_router(metrics_router)
 
 
 @app.websocket("/ws/test")
@@ -62,4 +66,4 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.debug,
         log_level="info"
-    ) 
+    )
