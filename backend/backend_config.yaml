@@ -7,7 +7,7 @@ server_path: /home/jack/NEW-BACKEND/server/server.py
 
 # Backend API Configuration
 backend:
-  host: "localhost"                # Backend host
+  host: "192.168.1.223"                # Backend host
   port: 8000                       # Backend port
   enable_cors: true                # Enable CORS for web frontends
   max_connections: 100             # Maximum WebSocket connections
