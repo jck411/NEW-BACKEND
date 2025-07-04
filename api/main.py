@@ -10,7 +10,6 @@ from api.dependencies import get_connection_manager
 from api.handlers.websocket_handlers import handle_test_websocket, handle_websocket_connection
 from api.lifecycle import lifespan
 from api.routers.health import router as health_router
-from api.routers.metrics import router as metrics_router
 from api.services.connection_manager import ConnectionManager
 
 # Configure structured logging
@@ -40,7 +39,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router)
-app.include_router(metrics_router)
 
 
 @app.websocket("/ws/test")

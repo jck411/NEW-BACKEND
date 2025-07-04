@@ -60,25 +60,17 @@
 
 ### Critical Missing Features
 
-1. **Prometheus Metrics Endpoint** 
-   - Status: ✅ **COMPLIANT** - Added `/metrics` endpoint  
-   - File: `api/routers/metrics.py`
-   - Current State: **Ready but unused** (no Prometheus server scraping yet)
-   - Purpose: **MONITORING ONLY** - doesn't affect app functionality
-   - Shows: Active WebSocket connections, request counts, response times
-   - Note: Meets rule requirement, actual Prometheus setup optional for now
-
-2. **Pre-commit Hooks Global Setup**
+1. **Pre-commit Hooks Global Setup**
    - Status: ⚠️ **IN PROGRESS** - `.pre-commit-config.yaml` added
    - Missing: Global Git template setup
    - Action: Run setup commands below
 
-3. **API Latency Monitoring**
+2. **API Latency Monitoring**
    - Status: ❌ Not implemented  
    - Need: Middleware to track P95 latency
    - Need: Alerting when breached 3x in 15min
 
-4. **Test Coverage Below Target**
+3. **Test Coverage Below Target**
    - Current: 30%
    - Target: 70% for critical logic
    - Focus: `server/` module (0% coverage), increase API tests
@@ -101,9 +93,8 @@ pre-commit install
 
 ### Short Term (Next 2 Weeks)
 1. **Add latency monitoring middleware**
-2. **Implement actual Prometheus metrics collection**  
-3. **Write more tests** - Focus on server/ module
-4. **Fix MyPy errors gradually** - Start with easy ones
+2. **Write more tests** - Focus on server/ module
+3. **Fix MyPy errors gradually** - Start with easy ones
 
 ### Medium Term (Next Month)
 1. **Set up alerting** - For P95 latency breaches
