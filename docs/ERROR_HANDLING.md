@@ -36,7 +36,7 @@ raise ChatBotBaseException(
 - `ServerIncompatibleError` - MCP server doesn't support required features
 
 #### Connection Errors
-- `ConnectionError` - Base for connection issues
+- `ChatBotConnectionError` - Base for connection issues
 - `ServerConnectionError` - MCP server connection failed
 - `WebSocketConnectionError` - WebSocket connection issues
 - `STTConnectionError` - Speech-to-Text connection problems

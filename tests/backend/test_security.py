@@ -231,7 +231,7 @@ class TestDeepgramSTTSecurity:
     def test_deepgram_api_key_required(self):
         """Test that DeepgramSTT requires API key."""
         from backend.exceptions import DeepgramSTTError
-        from STT.deepgram_stt import DeepgramSTT
+        from stt.deepgram_stt import DeepgramSTT
 
         stt_config = {"api_key_env": "DEEPGRAM_API_KEY"}
         utterance_callback = MagicMock()
@@ -244,7 +244,7 @@ class TestDeepgramSTTSecurity:
     def test_deepgram_custom_env_var(self):
         """Test that DeepgramSTT respects custom environment variable name."""
         from backend.exceptions import DeepgramSTTError
-        from STT.deepgram_stt import DeepgramSTT
+        from stt.deepgram_stt import DeepgramSTT
 
         stt_config = {"api_key_env": "CUSTOM_DEEPGRAM_KEY"}
         utterance_callback = MagicMock()

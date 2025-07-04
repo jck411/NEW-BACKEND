@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 """Deepgram SDK Speech-to-Text integration.
 
 Refactored following 2025 best practices with proper separation of concerns.
 """
+
 import asyncio
 import logging
 import os
@@ -25,12 +25,19 @@ load_dotenv()
 
 class DeepgramSTT:
     """Refactored Deepgram SDK-based Speech-to-Text integration.
+
     Following 2025 best practices with proper separation of concerns.
     """
 
     def __init__(
         self, stt_config: dict[str, Any], utterance_callback: Callable[[str], None]
     ) -> None:
+        """Initialize the Deepgram STT service.
+
+        Args:
+            stt_config: Configuration dictionary for STT settings
+            utterance_callback: Callback function to handle complete utterances
+        """
         self.stt_config = stt_config
         self.utterance_callback = utterance_callback
         self.logger = logging.getLogger(__name__)
@@ -59,8 +66,8 @@ class DeepgramSTT:
 
             # Update state across components
             self.is_running = True
-            self.event_handlers.set_running_state(True)
-            self.keepalive_manager.set_running_state(True)
+            self.event_handlers.set_running_state(is_running=True)
+            self.keepalive_manager.set_running_state(is_running=True)
 
             self.logger.info("🎤 Deepgram live transcription started (modular)")
 
@@ -72,14 +79,14 @@ class DeepgramSTT:
                 error_code="STT_START_FAILED",
                 logger=self.logger,
             )
-            raise wrapped_error
+            raise wrapped_error from e
 
     async def finish_transcription(self) -> None:
         """Finish transcription using modular components."""
         try:
             self.is_running = False
-            self.event_handlers.set_running_state(False)
-            self.keepalive_manager.set_running_state(False)
+            self.event_handlers.set_running_state(is_running=False)
+            self.keepalive_manager.set_running_state(is_running=False)
 
             # Stop keepalive first
             await self.keepalive_manager.stop_keepalive()
@@ -98,7 +105,7 @@ class DeepgramSTT:
         if not self.is_running:
             return
 
-        self.event_handlers.set_streaming_response(True)
+        self.event_handlers.set_streaming_response(is_streaming=True)
         self.keepalive_manager.pause_for_response_streaming()
 
         # Start keepalive with current connection
@@ -114,7 +121,7 @@ class DeepgramSTT:
         if not self.is_running:
             return
 
-        self.event_handlers.set_streaming_response(False)
+        self.event_handlers.set_streaming_response(is_streaming=False)
         self.keepalive_manager.resume_from_response_streaming()
 
     # Sync wrapper methods using dedicated event loop
@@ -138,7 +145,7 @@ class DeepgramSTT:
                 error_code="STT_SERVICE_START_FAILED",
                 logger=self.logger,
             )
-            raise wrapped_error
+            raise wrapped_error from e
 
     def stop(self) -> None:
         """Stop the STT service."""
@@ -170,7 +177,7 @@ class DeepgramSTT:
 
         self.logger.info("STT cleanup complete")
 
-    def __enter__(self):
+    def __enter__(self) -> "DeepgramSTT":
         self.start()
         return self
 
@@ -179,5 +186,5 @@ class DeepgramSTT:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
-    ):
+    ) -> None:
         self.cleanup()

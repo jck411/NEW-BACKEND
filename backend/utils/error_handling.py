@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import Any, ParamSpec, TypeVar
 
 from backend.exceptions import (
-    ChatBotBaseException,
+    ChatBotBaseError,
     ConfigurationError,
     ServerConnectionError,
     SessionError,
@@ -21,7 +21,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def handle_errors(
-    exception_class: type[ChatBotBaseException],
+    exception_class: type[ChatBotBaseError],
     message: str,
     error_code: str | None = None,
     log_level: int = logging.ERROR,
@@ -107,12 +107,12 @@ def handle_errors(
 
 def log_and_wrap_error(
     exception: Exception,
-    exception_class: type[ChatBotBaseException],
+    exception_class: type[ChatBotBaseError],
     message: str,
     error_code: str | None = None,
     context: dict[str, Any] | None = None,
     logger: logging.Logger | None = None,
-) -> ChatBotBaseException:
+) -> ChatBotBaseError:
     """Standardized error logging and wrapping utility.
 
     Args:

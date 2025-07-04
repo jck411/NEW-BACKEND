@@ -4,14 +4,22 @@ import shlex
 from contextlib import AsyncExitStack
 from typing import Any
 
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.shared.message import SessionMessage
 
 from .exceptions import (
     ServerConnectionError,
     SessionNotInitializedError,
 )
 from .utils import log_and_wrap_error
+
+# Type alias for the transport tuple returned by stdio_client
+STDIOTransport = tuple[
+    MemoryObjectReceiveStream[SessionMessage | Exception],
+    MemoryObjectSendStream[SessionMessage],
+]
 
 
 class MCPSession:
@@ -77,12 +85,13 @@ class MCPSession:
                 command=command, args=args, **valid_params
             )
 
-            stdio_transport = await self.exit_stack.enter_async_context(
-                stdio_client(server_params_obj)
+            # stdio_client returns an async context manager that yields a tuple
+            stdio_transport: STDIOTransport = await self.exit_stack.enter_async_context(
+                stdio_client(server_params_obj)  # type: ignore[arg-type]
             )
 
             self.session = await self.exit_stack.enter_async_context(
-                ClientSession(stdio_transport[0], stdio_transport[1])
+                ClientSession(stdio_transport[0], stdio_transport[1])  # type: ignore[arg-type]
             )
 
             await self.session.initialize()
@@ -154,3 +163,6 @@ class MCPSession:
             pass
         except (OSError, RuntimeError, ValueError, ConnectionError) as e:
             self.logger.warning("Error during session cleanup: %s", e)
+        except Exception as e:  # noqa: BLE001
+            # Catch-all for resource cleanup: this is safe here because cleanup must not raise
+            self.logger.warning("Unexpected error during session cleanup: %s", e)

@@ -1,7 +1,7 @@
 """Tests for backend exceptions."""
 
 from backend.exceptions import (
-    ChatBotBaseException,
+    ChatBotBaseError,
     ConfigurationError,
     MessageProcessingError,
     ServerConnectionError,
@@ -10,12 +10,12 @@ from backend.exceptions import (
 )
 
 
-class TestChatBotBaseException:
-    """Test suite for ChatBotBaseException."""
+class TestChatBotBaseError:
+    """Test suite for ChatBotBaseError."""
 
     def test_basic_exception_creation(self) -> None:
         """Test creating a basic exception."""
-        exc = ChatBotBaseException("Test message")
+        exc = ChatBotBaseError("Test message")
         assert str(exc) == "Test message"
         assert exc.message == "Test message"
         assert exc.error_code is None
@@ -27,11 +27,11 @@ class TestChatBotBaseException:
         context = {"key": "value"}
         cause = ValueError("Original error")
 
-        exc = ChatBotBaseException(
+        exc = ChatBotBaseError(
             message="Test message",
             error_code="TEST_ERROR",
             context=context,
-            cause=cause
+            cause=cause,
         )
 
         assert exc.message == "Test message"
@@ -44,16 +44,16 @@ class TestChatBotBaseException:
         context = {"key": "value"}
         cause = ValueError("Original error")
 
-        exc = ChatBotBaseException(
+        exc = ChatBotBaseError(
             message="Test message",
             error_code="TEST_ERROR",
             context=context,
-            cause=cause
+            cause=cause,
         )
 
         result = exc.to_dict()
 
-        assert result["error_type"] == "ChatBotBaseException"
+        assert result["error_type"] == "ChatBotBaseError"
         assert result["message"] == "Test message"
         assert result["error_code"] == "TEST_ERROR"
         assert result["context"] == context
@@ -61,10 +61,8 @@ class TestChatBotBaseException:
 
     def test_str_representation(self) -> None:
         """Test string representation with error code and context."""
-        exc = ChatBotBaseException(
-            message="Test message",
-            error_code="TEST_ERROR",
-            context={"key": "value"}
+        exc = ChatBotBaseError(
+            message="Test message", error_code="TEST_ERROR", context={"key": "value"}
         )
 
         str_repr = str(exc)
@@ -79,22 +77,21 @@ class TestDomainSpecificExceptions:
     def test_configuration_error_inheritance(self) -> None:
         """Test that ConfigurationError inherits from base exception."""
         exc = ConfigurationError("Config error")
-        assert isinstance(exc, ChatBotBaseException)
+        assert isinstance(exc, ChatBotBaseError)
         assert exc.message == "Config error"
 
     def test_server_connection_error(self) -> None:
         """Test ServerConnectionError creation."""
         exc = ServerConnectionError(
-            "Connection failed",
-            error_code="CONNECTION_TIMEOUT"
+            "Connection failed", error_code="CONNECTION_TIMEOUT"
         )
-        assert isinstance(exc, ChatBotBaseException)
+        assert isinstance(exc, ChatBotBaseError)
         assert exc.error_code == "CONNECTION_TIMEOUT"
 
     def test_message_processing_error(self) -> None:
         """Test MessageProcessingError creation."""
         exc = MessageProcessingError("Processing failed")
-        assert isinstance(exc, ChatBotBaseException)
+        assert isinstance(exc, ChatBotBaseError)
 
 
 class TestWrapException:
@@ -105,7 +102,7 @@ class TestWrapException:
         original = ValueError("Original error")
         wrapped = wrap_exception(original)
 
-        assert isinstance(wrapped, ChatBotBaseException)
+        assert isinstance(wrapped, ChatBotBaseError)
         assert wrapped.cause == original
         assert "Original error" in wrapped.message
 
@@ -116,7 +113,7 @@ class TestWrapException:
             original,
             exception_class=ConfigurationError,
             message="Custom message",
-            error_code="CUSTOM_ERROR"
+            error_code="CUSTOM_ERROR",
         )
 
         assert isinstance(wrapped, ConfigurationError)
@@ -141,4 +138,4 @@ class TestGetExceptionForDomain:
     def test_get_unknown_domain_exception(self) -> None:
         """Test getting exception class for unknown domain."""
         exc_class = get_exception_for_domain("unknown")
-        assert exc_class == ChatBotBaseException
+        assert exc_class == ChatBotBaseError

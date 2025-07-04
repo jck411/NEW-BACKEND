@@ -8,19 +8,27 @@ import contextlib
 import logging
 from typing import Any
 
+from .connection import DeepgramConnection
+
 
 class KeepAliveManager:
     """Manages KeepAlive functionality for Deepgram STT."""
 
     def __init__(self, logger: logging.Logger, stt_config: dict[str, Any]) -> None:
+        """Initialize the KeepAlive manager.
+
+        Args:
+            logger: Logger instance for keepalive operations
+            stt_config: Configuration dictionary for STT settings
+        """
         self.logger = logger
         self.stt_config = stt_config
         self.keepalive_task: asyncio.Task[None] | None = None
         self.is_streaming_response = False
         self.is_running = False
-        self.dg_connection: Any = None
+        self.dg_connection: DeepgramConnection | None = None
 
-    async def start_keepalive(self, dg_connection: Any) -> None:
+    async def start_keepalive(self, dg_connection: DeepgramConnection) -> None:
         """Start KeepAlive using official Deepgram method."""
         if self.keepalive_task and not self.keepalive_task.done():
             return
@@ -56,10 +64,10 @@ class KeepAliveManager:
                 await asyncio.sleep(interval)
         except asyncio.CancelledError:
             self.logger.debug("KeepAlive sender cancelled")
-        except Exception as e:
-            self.logger.exception("Error in KeepAlive sender: %s", e)
+        except Exception:
+            self.logger.exception("Error in KeepAlive sender")
 
-    def set_running_state(self, is_running: bool) -> None:
+    def set_running_state(self, *, is_running: bool) -> None:
         """Set running state."""
         self.is_running = is_running
 

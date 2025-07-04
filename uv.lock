@@ -222,7 +222,7 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = "~=24.1.0" },
     { name = "aiofiles", marker = "extra == 'server'", specifier = "~=24.1.0" },
-    { name = "deepgram-sdk", specifier = "~=4.3.1" },
+    { name = "deepgram-sdk", specifier = "==4.3.1" },
     { name = "deepgram-sdk", marker = "extra == 'client'", specifier = "~=4.3.1" },
     { name = "fastapi", specifier = "~=0.115.13" },
     { name = "fastapi", marker = "extra == 'api'", specifier = "~=0.115.13" },

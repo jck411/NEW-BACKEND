@@ -1,10 +1,12 @@
-"""ChatBot Backend Exception Hierarchy
+"""ChatBot Backend Exception Hierarchy.
+
 Following 2025 best practices for error handling with structured exception classes.
 """
+
 from typing import Any
 
 
-class ChatBotBaseException(Exception):
+class ChatBotBaseError(Exception):
     """Base exception for all ChatBot-related errors.
 
     Provides structured error handling with optional error codes and context.
@@ -16,8 +18,16 @@ class ChatBotBaseException(Exception):
         message: str,
         error_code: str | None = None,
         context: dict[str, Any] | None = None,
-        cause: Exception | None = None
+        cause: Exception | None = None,
     ) -> None:
+        """Initialize the ChatBot base error.
+
+        Args:
+            message: Human-readable error message
+            error_code: Optional error code for programmatic handling
+            context: Optional dictionary with additional context
+            cause: Optional original exception that caused this error
+        """
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -31,7 +41,7 @@ class ChatBotBaseException(Exception):
             "message": self.message,
             "error_code": self.error_code,
             "context": self.context,
-            "cause": str(self.cause) if self.cause else None
+            "cause": str(self.cause) if self.cause else None,
         }
 
     def __str__(self) -> str:
@@ -44,7 +54,7 @@ class ChatBotBaseException(Exception):
 
 
 # === Configuration Errors ===
-class ConfigurationError(ChatBotBaseException):
+class ConfigurationError(ChatBotBaseError):
     """Base class for configuration-related errors."""
 
 
@@ -65,24 +75,24 @@ class ServerIncompatibleError(ConfigurationError):
 
 
 # === Connection Errors ===
-class ConnectionError(ChatBotBaseException):
+class ChatBotConnectionError(ChatBotBaseError):
     """Base class for connection-related errors."""
 
 
-class ServerConnectionError(ConnectionError):
+class ServerConnectionError(ChatBotConnectionError):
     """Failed to connect to MCP server."""
 
 
-class WebSocketConnectionError(ConnectionError):
+class WebSocketConnectionError(ChatBotConnectionError):
     """WebSocket connection error."""
 
 
-class STTConnectionError(ConnectionError):
+class STTConnectionError(ChatBotConnectionError):
     """Speech-to-Text connection error."""
 
 
 # === Session Errors ===
-class SessionError(ChatBotBaseException):
+class SessionError(ChatBotBaseError):
     """Base class for session-related errors."""
 
 
@@ -99,7 +109,7 @@ class ToolExecutionError(SessionError):
 
 
 # === Message Processing Errors ===
-class MessageError(ChatBotBaseException):
+class MessageError(ChatBotBaseError):
     """Base class for message processing errors."""
 
 
@@ -116,7 +126,7 @@ class ConversationError(MessageError):
 
 
 # === WebSocket Errors ===
-class WebSocketError(ChatBotBaseException):
+class WebSocketError(ChatBotBaseError):
     """Base class for WebSocket-related errors."""
 
 
@@ -133,7 +143,7 @@ class ChatBotUnavailableError(WebSocketError):
 
 
 # === STT (Speech-to-Text) Errors ===
-class STTError(ChatBotBaseException):
+class STTError(ChatBotBaseError):
     """Base class for Speech-to-Text errors."""
 
 
@@ -154,7 +164,7 @@ class DeepgramSTTError(STTError):
 
 
 # === Resource Management Errors ===
-class ResourceError(ChatBotBaseException):
+class ResourceError(ChatBotBaseError):
     """Base class for resource management errors."""
 
 
@@ -171,7 +181,7 @@ class ResourceExhaustionError(ResourceError):
 
 
 # === External Service Errors ===
-class ExternalServiceError(ChatBotBaseException):
+class ExternalServiceError(ChatBotBaseError):
     """Base class for external service errors."""
 
 
@@ -186,16 +196,16 @@ class DeepgramError(ExternalServiceError):
 # === Utility Functions ===
 def wrap_exception(
     exc: Exception,
-    exception_class: type = ChatBotBaseException,
+    exception_class: type = ChatBotBaseError,
     message: str | None = None,
     error_code: str | None = None,
-    context: dict[str, Any] | None = None
-) -> ChatBotBaseException:
+    context: dict[str, Any] | None = None,
+) -> ChatBotBaseError:
     """Wrap a generic exception in a ChatBot exception.
 
     Useful for converting third-party exceptions to our hierarchy.
     """
-    if isinstance(exc, ChatBotBaseException):
+    if isinstance(exc, ChatBotBaseError):
         return exc
 
     wrapped_message = message or f"Wrapped exception: {exc!s}"
@@ -206,7 +216,7 @@ def wrap_exception(
         message=wrapped_message,
         error_code=error_code,
         context=wrapped_context,
-        cause=exc
+        cause=exc,
     )
 
 
@@ -222,7 +232,7 @@ def get_exception_for_domain(domain: str) -> type:
     domain_mapping = {
         "config": ConfigurationError,
         "configuration": ConfigurationError,
-        "connection": ConnectionError,
+        "connection": ChatBotConnectionError,
         "session": SessionError,
         "message": MessageError,
         "websocket": WebSocketError,
@@ -234,4 +244,4 @@ def get_exception_for_domain(domain: str) -> type:
         "deepgram": DeepgramError,
     }
 
-    return domain_mapping.get(domain.lower(), ChatBotBaseException)
+    return domain_mapping.get(domain.lower(), ChatBotBaseError)

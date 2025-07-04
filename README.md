@@ -246,7 +246,7 @@ NEW-BACKEND/
 ├── server/                # MCP server implementation
 │   ├── server.py          # Main MCP server
 │   └── *.yaml             # Server configuration files
-├── STT/                   # Speech-to-Text integration
+├── stt/                   # Speech-to-Text integration
 
 ├── run_backend.py         # Backend API launcher
 └── pyproject.toml         # Project dependencies

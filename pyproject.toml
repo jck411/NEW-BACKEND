@@ -12,7 +12,7 @@ dependencies = [
     "fastmcp~=2.8.1",
     "watchfiles~=1.1.0",
     "aiofiles~=24.1.0",
-    "deepgram-sdk~=4.3.1",
+    "deepgram-sdk==4.3.1",
     "pyaudio~=0.2.14",
     # FastAPI backend dependencies
     "fastapi~=0.115.13",
@@ -78,7 +78,7 @@ addopts = [
     "--cov=api",
     "--cov=backend", 
     "--cov=server",
-    "--cov=STT",
+    "--cov=stt",
     "--cov-branch",
     "--cov-report=term-missing",
     "--cov-report=html:htmlcov",
@@ -94,7 +94,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["api", "backend", "server", "STT"]
+source = ["api", "backend", "server", "stt"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
@@ -174,7 +174,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [tool.mutmut]
-paths_to_mutate = "api/,backend/,server/,STT/"
+paths_to_mutate = "api/,backend/,server/,stt/"
 backup = false
 runner = "pytest"
 tests_dir = "tests/" 

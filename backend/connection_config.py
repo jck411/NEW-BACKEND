@@ -18,6 +18,11 @@ class ConnectionConfig:
     """Manages client connection configuration for MCP servers."""
 
     def __init__(self, config_file: str = "backend/backend_config.yaml") -> None:
+        """Initialize the connection configuration manager.
+
+        Args:
+            config_file: Path to the configuration file
+        """
         self.config_file = config_file
         self.config: dict[str, Any] = {}
         self.logger = logging.getLogger(__name__)
@@ -37,7 +42,7 @@ class ConnectionConfig:
             )
 
         try:
-            with open(config_path) as f:
+            with config_path.open() as f:
                 self.config = yaml.safe_load(f) or {}
             self.logger.info("Loaded connection config from %s", self.config_file)
         except (FileNotFoundError, yaml.YAMLError, OSError) as e:
@@ -49,7 +54,7 @@ class ConnectionConfig:
                 context={"config_file": self.config_file},
                 logger=self.logger,
             )
-            raise wrapped_error
+            raise wrapped_error from e
 
     def get_server_command(self) -> list[str]:
         """Get server command for connection using 2025 best practices.
@@ -134,11 +139,11 @@ class ConnectionConfig:
             config_path = Path(self.config_file)
             config_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(self.config_file, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(self.config, f, default_flow_style=False, indent=2)
             self.logger.info("Saved connection config to %s", self.config_file)
-        except Exception as e:
-            self.logger.exception("Failed to save connection config: %s", e)
+        except Exception:
+            self.logger.exception("Failed to save connection config")
             raise
 
     def get_config_file_path(self) -> str:
@@ -178,6 +183,7 @@ class ConnectionConfig:
 
     def set_backend_config(
         self,
+        *,
         host: str | None = None,
         port: int | None = None,
         enable_cors: bool | None = None,

@@ -8,6 +8,7 @@ Supports real-time streaming chat and optional Speech-to-Text.
 import asyncio
 import contextlib
 import json
+import logging
 import queue
 import threading
 import uuid
@@ -17,27 +18,32 @@ import websockets
 import websockets.exceptions
 
 if TYPE_CHECKING:
-    from STT import DeepgramSTT
+    from stt import DeepgramSTT
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 # Import backend config to get backend connection details and STT config
 try:
     from backend.connection_config import ConnectionConfig
-    from STT import DeepgramSTT
+    from stt import DeepgramSTT
 
     client_config = ConnectionConfig()
     backend_config = client_config.get_backend_config()
     websocket_uri = f"ws://{backend_config['host']}:{backend_config['port']}/ws/chat"
     stt_available = True
-except Exception:
+except (ImportError, AttributeError, KeyError) as e:
+    logger.warning("Failed to load backend config: %s", e)
     websocket_uri = "ws://localhost:8000/ws/chat"
     stt_available = False
-    DeepgramSTT = None  # type: ignore
+    DeepgramSTT = None  # type: ignore[assignment]
 
 
 class TerminalChatClient:
     """Terminal-based chat client."""
 
     def __init__(self) -> None:
+        """Initialize the terminal chat client."""
         self.websocket: Any | None = (
             None  # Using Any to handle websocket type variations
         )
@@ -54,10 +60,12 @@ class TerminalChatClient:
         """Connect to the backend WebSocket."""
         try:
             self.websocket = await websockets.connect(websocket_uri)
+        except (websockets.exceptions.WebSocketException, OSError):
+            logger.exception("Failed to connect to WebSocket")
+            return False
+        else:
             self.connection_status = "Connected"
             return True
-        except Exception:
-            return False
 
     async def listen_for_messages(self) -> None:
         """Listen for incoming WebSocket messages."""
@@ -69,11 +77,12 @@ class TerminalChatClient:
                 try:
                     data = json.loads(message)
                     self.handle_message(data)
-                except Exception:
-                    pass
+                except json.JSONDecodeError as e:
+                    logger.warning("Failed to parse WebSocket message: %s", e)
         except websockets.exceptions.ConnectionClosed:
             self.connection_status = "Disconnected"
         except Exception:
+            logger.exception("WebSocket listening error")
             self.connection_status = "Error"
 
     def handle_message(self, data: dict[str, Any]) -> None:
@@ -139,7 +148,8 @@ class TerminalChatClient:
 
         try:
             await self.websocket.send(json.dumps(message_data))
-        except Exception:
+        except (websockets.exceptions.WebSocketException, OSError):
+            logger.exception("Failed to send message")
             # Resume STT on error
             if self.stt_instance:
                 self.stt_instance.resume_from_response_streaming()
@@ -161,10 +171,11 @@ class TerminalChatClient:
             self.stt_instance = DeepgramSTT(stt_config, utterance_callback)
             self.stt_instance.start()
             self.stt_enabled = True
-            return True
-
-        except Exception:
+        except (ImportError, AttributeError, KeyError):
+            logger.exception("Failed to setup STT")
             return False
+        else:
+            return True
 
     def keyboard_input_thread(self) -> None:
         """Handle keyboard input in a separate thread."""
@@ -181,6 +192,51 @@ class TerminalChatClient:
                 self.message_queue.put(("quit", None))
                 break
 
+    def _process_user_input(self, message_type: str, user_input: str | None) -> bool:
+        """Process user input and return True if should continue, False if should quit."""
+        if message_type == "quit":
+            return False
+        if message_type in ["stt", "keyboard"] and user_input:
+            # Normalize input for quit commands
+            normalized_input: str = user_input.lower().strip().rstrip(".,!?;:")
+            if normalized_input in ["exit", "quit", "bye"]:
+                return False
+
+            if user_input:
+                # Show user input (especially important for STT)
+                if message_type == "stt":
+                    pass
+
+                # Store reference to avoid dangling task
+                task = asyncio.create_task(self.send_message(user_input))
+                # Keep reference to prevent garbage collection
+                setattr(self, f"_send_task_{id(task)}", task)
+        return True
+
+    async def _main_loop(self) -> None:
+        """Main message processing loop."""
+        while True:
+            try:
+                # Get next message (either from STT or keyboard)
+                message_type: str
+                user_input: str | None
+                message_type, user_input = self.message_queue.get(timeout=0.1)
+
+                if not self._process_user_input(message_type, user_input):
+                    break
+
+            except queue.Empty:
+                # Allow the event loop to process other tasks
+                await asyncio.sleep(0.1)
+                continue
+            except KeyboardInterrupt:
+                break
+            except Exception:
+                logger.exception("Error in main loop")
+                # Resume STT after error
+                if self.stt_instance:
+                    self.stt_instance.resume_from_response_streaming()
+
     async def run(self) -> None:
         """Main chat loop."""
         # Connect to backend
@@ -190,9 +246,9 @@ class TerminalChatClient:
         # Setup STT if available
         stt_setup_success = self.setup_stt()
         if stt_setup_success:
-            pass
+            logger.info("STT enabled")
         else:
-            pass
+            logger.info("STT disabled")
 
         # Start keyboard input thread
         input_thread = threading.Thread(target=self.keyboard_input_thread, daemon=True)
@@ -200,42 +256,10 @@ class TerminalChatClient:
 
         # Start message listener
         listen_task = asyncio.create_task(self.listen_for_messages())
+        self._listen_task = listen_task  # Store reference
 
         try:
-            while True:
-                try:
-                    # Get next message (either from STT or keyboard)
-                    message_type: str
-                    user_input: str | None
-                    message_type, user_input = self.message_queue.get(timeout=0.1)
-
-                    if message_type == "quit":
-                        break
-                    if message_type in ["stt", "keyboard"] and user_input:
-                        # Normalize input for quit commands
-                        normalized_input: str = (
-                            user_input.lower().strip().rstrip(".,!?;:")
-                        )
-                        if normalized_input in ["exit", "quit", "bye"]:
-                            break
-
-                        if user_input:
-                            # Show user input (especially important for STT)
-                            if message_type == "stt":
-                                pass
-
-                            await self.send_message(user_input)
-
-                except queue.Empty:
-                    # Allow the event loop to process other tasks
-                    await asyncio.sleep(0.1)
-                    continue
-                except KeyboardInterrupt:
-                    break
-                except Exception:
-                    # Resume STT after error
-                    if self.stt_instance:
-                        self.stt_instance.resume_from_response_streaming()
+            await self._main_loop()
         finally:
             # Cleanup
             listen_task.cancel()
@@ -252,9 +276,9 @@ async def main() -> None:
     try:
         await client.run()
     except KeyboardInterrupt:
-        pass
+        logger.info("Terminal frontend interrupted")
     except Exception:
-        pass
+        logger.exception("Terminal frontend error")
 
 
 if __name__ == "__main__":

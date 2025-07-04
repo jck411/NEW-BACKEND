@@ -74,15 +74,15 @@ from .conversation import ConversationManager
 # Export exception hierarchy for easy access
 from .exceptions import (
     # Base exception
-    ChatBotBaseException,
+    ChatBotBaseError,
+    # Connection errors
+    ChatBotConnectionError,
     ChatBotUnavailableError,
     # Configuration errors
     ConfigurationError,
     ConfigurationLoadError,
     ConfigurationMissingError,
     ConfigurationValidationError,
-    # Connection errors
-    ConnectionError,
     ConversationError,
     DeepgramError,
     DeepgramSTTError,
@@ -126,14 +126,14 @@ __all__ = [
     # Main classes
     "ChatBot",
     # Exception hierarchy
-    "ChatBotBaseException",
+    "ChatBotBaseError",
+    "ChatBotConnectionError",
     "ChatBotUnavailableError",
     "ConfigurationError",
     "ConfigurationLoadError",
     "ConfigurationMissingError",
     "ConfigurationValidationError",
     "ConnectionConfig",
-    "ConnectionError",
     "ConversationError",
     "ConversationManager",
     "DeepgramError",
