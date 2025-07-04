@@ -1,5 +1,6 @@
-"""Backend settings configuration
-"""
+"""Backend settings configuration."""
+
+from typing import Any
 
 from pydantic_settings import BaseSettings
 
@@ -7,7 +8,7 @@ from backend.connection_config import ConnectionConfig
 
 
 class Settings(BaseSettings):
-    """Application settings"""
+    """Application settings."""
 
     # Server settings
     host: str = "0.0.0.0"
@@ -20,12 +21,12 @@ class Settings(BaseSettings):
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
-        "*"  # Allow all origins for now - restrict in production
+        "*",  # Allow all origins for now - restrict in production
     ]
 
     # WebSocket settings
     websocket_ping_interval: int = 30  # seconds
-    websocket_ping_timeout: int = 10   # seconds
+    websocket_ping_timeout: int = 10  # seconds
     max_connections: int = 100
 
     # Logging
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
     # ChatBot specific settings
     chatbot_config_file: str = "backend/backend_config.yaml"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Load client configuration to override defaults
         try:
@@ -50,9 +51,9 @@ class Settings(BaseSettings):
             if "max_connections" in backend_config:
                 self.max_connections = backend_config["max_connections"]
 
-        except Exception as e:
+        except (FileNotFoundError, ValueError, KeyError, OSError):
             # If client config fails to load, continue with defaults
-            print(f"Warning: Could not load client config for backend settings: {e}")
+            pass
 
     class Config:
         env_file = ".env"
@@ -61,10 +62,11 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-_settings = None
+_settings: Settings | None = None
+
 
 def get_settings() -> Settings:
-    """Get global settings instance"""
+    """Get global settings instance."""
     global _settings
     if _settings is None:
         _settings = Settings()

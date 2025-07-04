@@ -1,5 +1,4 @@
-"""Backend utilities package for shared functionality
-"""
+"""Backend utilities package for shared functionality."""
 
 from .content_extraction import extract_tool_content
 from .error_handling import (

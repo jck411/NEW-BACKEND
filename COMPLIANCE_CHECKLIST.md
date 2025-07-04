@@ -47,7 +47,7 @@
 
 ### Testing
 - [x] **Framework setup** - pytest, pytest-asyncio, pytest-cov configured
-- [ ] **70% coverage target** - Currently at 30% (improving)
+- [ ] **40% coverage target** - Currently at 30% (improving)
 - [x] **ruff configuration** - Modern setup with strict rules
 - [ ] **mypy --strict passing** - 180 errors remaining (work in progress)
 - [ ] **mutmut setup** - Configured but needs regular execution
@@ -72,8 +72,8 @@
 
 3. **Test Coverage Below Target**
    - Current: 30%
-   - Target: 70% for critical logic
-   - Focus: `server/` module (0% coverage), increase API tests
+   - Target: 40% for critical logic (realistic for hobby projects)
+   - Focus: `api/` and `backend/` modules (critical logic)
 
 ## 🚀 Action Items
 
@@ -98,14 +98,14 @@ pre-commit install
 
 ### Medium Term (Next Month)
 1. **Set up alerting** - For P95 latency breaches
-2. **Achieve 70% test coverage**
+2. **Achieve 40% test coverage**
 3. **Complete MyPy strict compliance**
 4. **Regular mutmut execution**
 
 ## 📊 Current Metrics
 
 - **Python Version**: 3.13.0 ✅
-- **Test Coverage**: 30% (Target: 70%) ⚠️
+- **Test Coverage**: 30% (Target: 40%) ⚠️
 - **MyPy Errors**: 180 (Target: 0) ❌
 - **File Size Compliance**: 100% ✅
 - **Security Compliance**: 100% ✅

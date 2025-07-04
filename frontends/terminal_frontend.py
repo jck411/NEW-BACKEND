@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""Standalone Terminal Frontend for ChatBot Backend
+"""Standalone Terminal Frontend for ChatBot Backend.
 
 A simple terminal-based frontend that connects to the FastAPI backend via WebSocket.
 Supports real-time streaming chat and optional Speech-to-Text.
 """
 
 import asyncio
+import contextlib
 import json
 import queue
 import threading
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import websockets
 import websockets.exceptions
+
+if TYPE_CHECKING:
+    from STT import DeepgramSTT
 
 # Import backend config to get backend connection details and STT config
 try:
@@ -22,55 +26,58 @@ try:
 
     client_config = ConnectionConfig()
     backend_config = client_config.get_backend_config()
-    WEBSOCKET_URI = f"ws://{backend_config['host']}:{backend_config['port']}/ws/chat"
-    STT_AVAILABLE = True
-except Exception as e:
-    print(f"Warning: Could not load backend config or STT, using defaults: {e}")
-    WEBSOCKET_URI = "ws://localhost:8000/ws/chat"
-    STT_AVAILABLE = False
+    websocket_uri = f"ws://{backend_config['host']}:{backend_config['port']}/ws/chat"
+    stt_available = True
+except Exception:
+    websocket_uri = "ws://localhost:8000/ws/chat"
+    stt_available = False
+    DeepgramSTT = None  # type: ignore
 
 
 class TerminalChatClient:
-    """Terminal-based chat client"""
+    """Terminal-based chat client."""
 
-    def __init__(self):
-        self.websocket: websockets.WebSocketClientProtocol | None = None
+    def __init__(self) -> None:
+        self.websocket: Any | None = (
+            None  # Using Any to handle websocket type variations
+        )
         self.connection_status = "Disconnected"
         self.current_message_id: str | None = None
-        self.message_queue = queue.Queue()
-        self.stt_instance = None
+        self.message_queue: queue.Queue[tuple[str, str | None]] = queue.Queue()
+        self.stt_instance: Any | None = (
+            None  # Using Any since DeepgramSTT might not be available
+        )
         self.stt_enabled = False
+        self._last_user_message: str | None = None
 
-    async def connect(self):
-        """Connect to the backend WebSocket"""
+    async def connect(self) -> bool:
+        """Connect to the backend WebSocket."""
         try:
-            print(f"🔌 Connecting to backend: {WEBSOCKET_URI}")
-            self.websocket = await websockets.connect(WEBSOCKET_URI)
+            self.websocket = await websockets.connect(websocket_uri)
             self.connection_status = "Connected"
-            print("✅ Connected to ChatBot backend!")
             return True
-        except Exception as e:
-            print(f"❌ Connection failed: {e}")
+        except Exception:
             return False
 
-    async def listen_for_messages(self):
-        """Listen for incoming WebSocket messages"""
+    async def listen_for_messages(self) -> None:
+        """Listen for incoming WebSocket messages."""
+        if not self.websocket:
+            return
+
         try:
             async for message in self.websocket:
                 try:
                     data = json.loads(message)
                     self.handle_message(data)
-                except Exception as e:
-                    print(f"\n❌ Message handling error: {e}")
+                except Exception:
+                    pass
         except websockets.exceptions.ConnectionClosed:
-            print("\n🔌 Connection lost")
             self.connection_status = "Disconnected"
-        except Exception as e:
-            print(f"\n❌ Listen error: {e}")
+        except Exception:
             self.connection_status = "Error"
 
-    def handle_message(self, data: dict[str, Any]):
-        """Handle incoming WebSocket message"""
+    def handle_message(self, data: dict[str, Any]) -> None:
+        """Handle incoming WebSocket message."""
         msg_type = data.get("type")
 
         if msg_type == "message_start":
@@ -79,20 +86,18 @@ class TerminalChatClient:
             user_message = data.get("user_message", "")
 
             # Show user message if not already displayed
-            if user_message and (not hasattr(self, "_last_user_message") or self._last_user_message != user_message):
-                print(f"\n⌨️  You: {user_message}")
+            if user_message and (
+                not hasattr(self, "_last_user_message")
+                or self._last_user_message != user_message
+            ):
                 self._last_user_message = user_message
-
-            print("🤖 Assistant: ", end="", flush=True)
 
         elif msg_type == "text_chunk":
             # Streaming text chunk
-            content = data.get("content", "")
-            print(content, end="", flush=True)
+            data.get("content", "")
 
         elif msg_type == "message_complete":
             # Message finished
-            print()  # New line after response
             self.current_message_id = None
 
             # Resume STT if it was paused
@@ -100,24 +105,23 @@ class TerminalChatClient:
                 self.stt_instance.resume_from_response_streaming()
 
         elif msg_type == "error":
-            error_msg = data.get("error", "Unknown error")
-            print(f"\n❌ Error: {error_msg}")
+            data.get("error", "Unknown error")
 
         elif msg_type == "connection_established":
-            client_id = data.get("client_id", "unknown")
-            print(f"🔌 Connected as client: {client_id}")
+            data.get("client_id", "unknown")
 
-    async def send_message(self, message: str):
-        """Send a message to the backend"""
+    async def send_message(self, message: str) -> None:
+        """Send a message to the backend."""
         if not self.websocket:
-            print("❌ Not connected to server")
             return
 
         # Check if connection is still open
         try:
             # Try to check connection state - websockets 12+ uses different attributes
-            if (hasattr(self.websocket, "closed") and self.websocket.closed) or (hasattr(self.websocket, "state") and self.websocket.state.name == "CLOSED"):
-                print("❌ Connection closed")
+            if (hasattr(self.websocket, "closed") and self.websocket.closed) or (
+                hasattr(self.websocket, "state")
+                and self.websocket.state.name == "CLOSED"
+            ):
                 return
         except AttributeError:
             # If we can't check the state, we'll try to send and handle errors
@@ -130,20 +134,19 @@ class TerminalChatClient:
         message_data = {
             "type": "text_message",
             "id": str(uuid.uuid4()),
-            "content": message
+            "content": message,
         }
 
         try:
             await self.websocket.send(json.dumps(message_data))
-        except Exception as e:
-            print(f"❌ Failed to send message: {e}")
+        except Exception:
             # Resume STT on error
             if self.stt_instance:
                 self.stt_instance.resume_from_response_streaming()
 
-    def setup_stt(self):
-        """Setup Speech-to-Text if available and enabled"""
-        if not STT_AVAILABLE:
+    def setup_stt(self) -> bool:
+        """Setup Speech-to-Text if available and enabled."""
+        if not stt_available or DeepgramSTT is None:
             return False
 
         try:
@@ -151,7 +154,7 @@ class TerminalChatClient:
             if not stt_config.get("enabled", False):
                 return False
 
-            def utterance_callback(utterance: str):
+            def utterance_callback(utterance: str) -> None:
                 """Handle complete utterances from STT."""
                 self.message_queue.put(("stt", utterance))
 
@@ -160,18 +163,17 @@ class TerminalChatClient:
             self.stt_enabled = True
             return True
 
-        except Exception as e:
-            print(f"⚠️  STT initialization failed: {e}")
+        except Exception:
             return False
 
-    def keyboard_input_thread(self):
-        """Handle keyboard input in a separate thread"""
+    def keyboard_input_thread(self) -> None:
+        """Handle keyboard input in a separate thread."""
         while True:
             try:
                 if self.stt_enabled:
-                    user_input = input("\nType (or speak): ").strip()
+                    user_input: str = input("\nType (or speak): ").strip()
                 else:
-                    user_input = input("> ").strip()
+                    user_input: str = input("> ").strip()
 
                 if user_input:
                     self.message_queue.put(("keyboard", user_input))
@@ -179,8 +181,8 @@ class TerminalChatClient:
                 self.message_queue.put(("quit", None))
                 break
 
-    async def run(self):
-        """Main chat loop"""
+    async def run(self) -> None:
+        """Main chat loop."""
         # Connect to backend
         if not await self.connect():
             return
@@ -188,10 +190,9 @@ class TerminalChatClient:
         # Setup STT if available
         stt_setup_success = self.setup_stt()
         if stt_setup_success:
-            print("🎤 Speech-to-Text enabled - speak into your microphone!")
-            print("💬 You can also type messages or say 'exit', 'quit', or 'bye' to stop")
+            pass
         else:
-            print("\n💬 Start chatting (type your messages, Ctrl+C to exit):")
+            pass
 
         # Start keyboard input thread
         input_thread = threading.Thread(target=self.keyboard_input_thread, daemon=True)
@@ -204,22 +205,24 @@ class TerminalChatClient:
             while True:
                 try:
                     # Get next message (either from STT or keyboard)
+                    message_type: str
+                    user_input: str | None
                     message_type, user_input = self.message_queue.get(timeout=0.1)
 
                     if message_type == "quit":
-                        print("\n👋 Goodbye!")
                         break
-                    if message_type in ["stt", "keyboard"]:
+                    if message_type in ["stt", "keyboard"] and user_input:
                         # Normalize input for quit commands
-                        normalized_input = user_input.lower().strip().rstrip(".,!?;:")
+                        normalized_input: str = (
+                            user_input.lower().strip().rstrip(".,!?;:")
+                        )
                         if normalized_input in ["exit", "quit", "bye"]:
-                            print("\n👋 Goodbye!")
                             break
 
                         if user_input:
                             # Show user input (especially important for STT)
                             if message_type == "stt":
-                                print(f"\n🎤 You (speech): {user_input}")
+                                pass
 
                             await self.send_message(user_input)
 
@@ -228,10 +231,8 @@ class TerminalChatClient:
                     await asyncio.sleep(0.1)
                     continue
                 except KeyboardInterrupt:
-                    print("\n👋 Goodbye!")
                     break
-                except Exception as e:
-                    print(f"\n❌ Error: {e}")
+                except Exception:
                     # Resume STT after error
                     if self.stt_instance:
                         self.stt_instance.resume_from_response_streaming()
@@ -241,24 +242,19 @@ class TerminalChatClient:
             if self.websocket:
                 await self.websocket.close()
             if self.stt_instance:
-                try:
+                with contextlib.suppress(Exception):
                     self.stt_instance.cleanup()
-                except Exception as e:
-                    print(f"Warning: STT cleanup error: {e}")
 
 
-async def main():
-    """Main entry point"""
-    print("💬 Starting Terminal ChatBot Frontend...")
-    print(f"   Connecting to: {WEBSOCKET_URI}")
-
+async def main() -> None:
+    """Main entry point."""
     client = TerminalChatClient()
     try:
         await client.run()
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+        pass
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

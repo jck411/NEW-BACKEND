@@ -12,10 +12,10 @@ class TestStructuredLogging:
         logger = get_logger("test_logger")
 
         # Should be able to call logging methods
-        assert hasattr(logger, 'info')
-        assert hasattr(logger, 'error')
-        assert hasattr(logger, 'warning')
-        assert hasattr(logger, 'debug')
+        assert hasattr(logger, "info")
+        assert hasattr(logger, "error")
+        assert hasattr(logger, "warning")
+        assert hasattr(logger, "debug")
 
     def test_structured_logging_configuration(self):
         """Test that structured logging configures without errors."""

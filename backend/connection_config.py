@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,77 +17,82 @@ from .utils import log_and_wrap_error
 class ConnectionConfig:
     """Manages client connection configuration for MCP servers."""
 
-    def __init__(self, config_file: str = "backend/backend_config.yaml"):
+    def __init__(self, config_file: str = "backend/backend_config.yaml") -> None:
         self.config_file = config_file
         self.config: dict[str, Any] = {}
         self.logger = logging.getLogger(__name__)
         self.load_config()
 
-    def load_config(self):
+    def load_config(self) -> None:
         """Load connection configuration from file."""
         config_path = Path(self.config_file)
 
         if not config_path.exists():
-            self.logger.error(f"Configuration file not found at {self.config_file}")
-            raise ResourceNotFoundError(f"Configuration file not found: {self.config_file}",
-                                      error_code="CONFIG_FILE_NOT_FOUND",
-                                      context={"config_file": self.config_file})
+            self.logger.error("Configuration file not found at %s", self.config_file)
+            msg = f"Configuration file not found: {self.config_file}"
+            raise ResourceNotFoundError(
+                msg,
+                error_code="CONFIG_FILE_NOT_FOUND",
+                context={"config_file": self.config_file},
+            )
 
         try:
             with open(config_path) as f:
                 self.config = yaml.safe_load(f) or {}
-            self.logger.info(f"Loaded connection config from {self.config_file}")
-        except Exception as e:
+            self.logger.info("Loaded connection config from %s", self.config_file)
+        except (FileNotFoundError, yaml.YAMLError, OSError) as e:
             wrapped_error = log_and_wrap_error(
-                e, ConfigurationLoadError, "Failed to load connection configuration",
+                e,
+                ConfigurationLoadError,
+                "Failed to load connection configuration",
                 error_code="CONFIG_LOAD_FAILED",
                 context={"config_file": self.config_file},
-                logger=self.logger
+                logger=self.logger,
             )
             raise wrapped_error
 
     def get_server_command(self) -> list[str]:
         """Get server command for connection using 2025 best practices.
-        
+
         Returns:
             Server command as list using modern MCP execution
-            
+
         Raises:
             ConfigurationMissingError: If server_path is not configured
         """
         server_path = self.config.get("server_path")
         if not server_path:
-            raise ConfigurationMissingError(
+            msg = (
                 f"No server_path configured in {self.config_file}. "
-                "Please set server_path to the path of your MCP server.",
+                "Please set server_path to the path of your MCP server."
+            )
+            raise ConfigurationMissingError(
+                msg,
                 error_code="SERVER_PATH_NOT_CONFIGURED",
-                context={"config_file": self.config_file}
+                context={"config_file": self.config_file},
             )
 
         # 2025 Best Practice: Use module execution with proper working directory
         # This is the most reliable method for MCP servers in 2025
-        import sys
         python_executable = sys.executable
 
         # Execute as module from project root to ensure proper imports
-        server_path_obj = Path(server_path)
-        project_root = server_path_obj.parent.parent
+        Path(server_path)
 
         # Use -m flag to run as module from the correct directory
         return [python_executable, "-m", "server.server"]
 
     def get_server_env(self) -> dict[str, str]:
         """Get environment variables for the MCP server using 2025 best practices.
-        
+
         Returns:
             Environment variables for module execution
         """
-        env = os.environ.copy()
-        return env
+        return os.environ.copy()
 
     def get_server_cwd(self) -> str:
         """Get the working directory for the MCP server using 2025 best practices.
-        
+
         Returns:
             Working directory path (project root)
         """
@@ -96,29 +102,32 @@ class ConnectionConfig:
 
         # Set working directory to project root for proper module execution
         server_path_obj = Path(server_path)
-        project_root = str(server_path_obj.parent.parent)  # Go up from server/server.py to project root
-
-        return project_root
+        return str(
+            server_path_obj.parent.parent
+        )  # Go up from server/server.py to project root
 
     def get_server_path(self) -> str:
         """Get the configured server path."""
         server_path = self.config.get("server_path")
         if not server_path:
-            raise ConfigurationMissingError(
+            msg = (
                 f"No server_path configured in {self.config_file}. "
-                "Please set server_path to the path of your MCP server.",
+                "Please set server_path to the path of your MCP server."
+            )
+            raise ConfigurationMissingError(
+                msg,
                 error_code="SERVER_PATH_NOT_CONFIGURED",
-                context={"config_file": self.config_file}
+                context={"config_file": self.config_file},
             )
         return server_path
 
-    def set_server_path(self, path: str):
+    def set_server_path(self, path: str) -> None:
         """Set the server path and save configuration."""
         self.config["server_path"] = path
         self.save_config()
-        self.logger.info(f"Updated server path to: {path}")
+        self.logger.info("Updated server path to: %s", path)
 
-    def save_config(self):
+    def save_config(self) -> None:
         """Save current configuration to file."""
         try:
             # Ensure the directory exists
@@ -127,9 +136,9 @@ class ConnectionConfig:
 
             with open(self.config_file, "w") as f:
                 yaml.dump(self.config, f, default_flow_style=False, indent=2)
-            self.logger.info(f"Saved connection config to {self.config_file}")
+            self.logger.info("Saved connection config to %s", self.config_file)
         except Exception as e:
-            self.logger.error(f"Failed to save connection config: {e}")
+            self.logger.exception("Failed to save connection config: %s", e)
             raise
 
     def get_config_file_path(self) -> str:
@@ -147,12 +156,15 @@ class ConnectionConfig:
 
     def get_backend_config(self) -> dict[str, Any]:
         """Get backend configuration settings."""
-        return self.config.get("backend", {
-            "host": "localhost",
-            "port": 8000,
-            "enable_cors": True,
-            "max_connections": 100
-        })
+        return self.config.get(
+            "backend",
+            {
+                "host": "localhost",
+                "port": 8000,
+                "enable_cors": True,
+                "max_connections": 100,
+            },
+        )
 
     def get_backend_host(self) -> str:
         """Get the backend host."""
@@ -164,7 +176,13 @@ class ConnectionConfig:
         backend_config = self.get_backend_config()
         return backend_config.get("port", 8000)
 
-    def set_backend_config(self, host: str = None, port: int = None, enable_cors: bool = None, max_connections: int = None):
+    def set_backend_config(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        enable_cors: bool | None = None,
+        max_connections: int | None = None,
+    ) -> None:
         """Set backend configuration and save."""
         if "backend" not in self.config:
             self.config["backend"] = {}

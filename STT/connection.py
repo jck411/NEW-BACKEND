@@ -1,6 +1,8 @@
 """Deepgram STT Connection Manager
-Following 2025 best practices for connection management
+
+Following 2025 best practices for connection management.
 """
+
 import asyncio
 import logging
 import threading
@@ -14,9 +16,9 @@ from deepgram import (
 
 
 class DeepgramConnectionManager:
-    """Manages Deepgram STT connections and lifecycle"""
+    """Manages Deepgram STT connections and lifecycle."""
 
-    def __init__(self, api_key: str, stt_config: dict, logger: logging.Logger):
+    def __init__(self, api_key: str, stt_config: dict, logger: logging.Logger) -> None:
         # Don't store API key as instance variable for security
         self.stt_config = stt_config
         self.logger = logger
@@ -31,25 +33,37 @@ class DeepgramConnectionManager:
         self.dg_thread = threading.Thread(target=self._run_dg_loop, daemon=True)
         self.dg_thread.start()
 
-    def _run_dg_loop(self):
-        """Run the dedicated asyncio event loop for Deepgram operations"""
+    def _run_dg_loop(self) -> None:
+        """Run the dedicated asyncio event loop for Deepgram operations."""
         asyncio.set_event_loop(self.dg_loop)
         self.dg_loop.run_forever()
 
-    async def start_connection(self, event_handlers):
-        """Start live transcription connection"""
+    async def start_connection(self, event_handlers: object):
+        """Start live transcription connection."""
         try:
             # Create live connection
             self.dg_connection = self.deepgram.listen.asyncwebsocket.v("1")
 
             # Set up event handlers
             self.dg_connection.on(LiveTranscriptionEvents.Open, event_handlers.on_open)
-            self.dg_connection.on(LiveTranscriptionEvents.Transcript, event_handlers.on_transcript)
-            self.dg_connection.on(LiveTranscriptionEvents.Metadata, event_handlers.on_metadata)
-            self.dg_connection.on(LiveTranscriptionEvents.SpeechStarted, event_handlers.on_speech_started)
-            self.dg_connection.on(LiveTranscriptionEvents.UtteranceEnd, event_handlers.on_utterance_end)
-            self.dg_connection.on(LiveTranscriptionEvents.Close, event_handlers.on_close)
-            self.dg_connection.on(LiveTranscriptionEvents.Error, event_handlers.on_error)
+            self.dg_connection.on(
+                LiveTranscriptionEvents.Transcript, event_handlers.on_transcript
+            )
+            self.dg_connection.on(
+                LiveTranscriptionEvents.Metadata, event_handlers.on_metadata
+            )
+            self.dg_connection.on(
+                LiveTranscriptionEvents.SpeechStarted, event_handlers.on_speech_started
+            )
+            self.dg_connection.on(
+                LiveTranscriptionEvents.UtteranceEnd, event_handlers.on_utterance_end
+            )
+            self.dg_connection.on(
+                LiveTranscriptionEvents.Close, event_handlers.on_close
+            )
+            self.dg_connection.on(
+                LiveTranscriptionEvents.Error, event_handlers.on_error
+            )
 
             # Configure options
             options = LiveOptions(
@@ -67,7 +81,8 @@ class DeepgramConnectionManager:
             # Start connection
             started = await self.dg_connection.start(options)
             if not started:
-                raise Exception("Failed to start Deepgram connection")
+                msg = "Failed to start Deepgram connection"
+                raise Exception(msg)
 
             # Set up microphone
             self.microphone = Microphone(self.dg_connection.send)
@@ -76,18 +91,18 @@ class DeepgramConnectionManager:
             self.logger.info("🎤 Deepgram live transcription started")
             return self.dg_connection
 
-        except Exception as e:
-            self.logger.error(f"Error starting live transcription: {e}")
+        except Exception:
+            self.logger.exception("Error starting live transcription")
             raise
 
-    async def finish_connection(self):
-        """Finish transcription and cleanup connections"""
+    async def finish_connection(self) -> None:
+        """Finish transcription and cleanup connections."""
         try:
             # Stop microphone first
             if self.microphone:
                 try:
                     self.microphone.finish()
-                except Exception:
+                except (RuntimeError, OSError, AttributeError):
                     pass  # Ignore microphone cleanup errors
                 self.microphone = None
 
@@ -95,17 +110,17 @@ class DeepgramConnectionManager:
             if self.dg_connection:
                 try:
                     await asyncio.wait_for(self.dg_connection.finish(), timeout=2.0)
-                except (TimeoutError, Exception):
+                except (TimeoutError, RuntimeError, OSError, AttributeError):
                     pass  # Ignore connection cleanup errors
                 self.dg_connection = None
 
             self.logger.info("🛑 Live transcription finished")
 
-        except Exception as e:
-            self.logger.debug(f"Error finishing transcription (ignoring): {e}")
+        except (RuntimeError, OSError, ConnectionError, ValueError) as e:
+            self.logger.debug("Error finishing transcription (ignoring): %s", e)
 
-    def cleanup(self):
-        """Clean up connection resources"""
+    def cleanup(self) -> None:
+        """Clean up connection resources."""
         if hasattr(self, "_cleanup_done") and self._cleanup_done:
             return
 
@@ -124,5 +139,5 @@ class DeepgramConnectionManager:
         self.logger.info("Connection cleanup complete")
 
     def get_connection(self):
-        """Get the current Deepgram connection"""
+        """Get the current Deepgram connection."""
         return self.dg_connection

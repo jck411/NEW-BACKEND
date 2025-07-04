@@ -1,12 +1,12 @@
 """ChatBot Backend Exception Hierarchy
-Following 2025 best practices for error handling with structured exception classes
+Following 2025 best practices for error handling with structured exception classes.
 """
 from typing import Any
 
 
 class ChatBotBaseException(Exception):
     """Base exception for all ChatBot-related errors.
-    
+
     Provides structured error handling with optional error codes and context.
     Following 2025 best practices for exception design.
     """
@@ -17,7 +17,7 @@ class ChatBotBaseException(Exception):
         error_code: str | None = None,
         context: dict[str, Any] | None = None,
         cause: Exception | None = None
-    ):
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -192,7 +192,7 @@ def wrap_exception(
     context: dict[str, Any] | None = None
 ) -> ChatBotBaseException:
     """Wrap a generic exception in a ChatBot exception.
-    
+
     Useful for converting third-party exceptions to our hierarchy.
     """
     if isinstance(exc, ChatBotBaseException):
@@ -212,10 +212,10 @@ def wrap_exception(
 
 def get_exception_for_domain(domain: str) -> type:
     """Get the appropriate base exception class for a domain.
-    
+
     Args:
         domain: The domain name (e.g., 'websocket', 'stt', 'config')
-        
+
     Returns:
         The appropriate base exception class
     """

@@ -1,6 +1,6 @@
-"""ChatBot Backend Package
+"""ChatBot Backend Package.
 
-A server-agnostic chatbot backend that connects to any compatible MCP server 
+A server-agnostic chatbot backend that connects to any compatible MCP server
 and integrates with OpenAI for conversational AI capabilities.
 
 This backend is designed to be 100% dependent on the MCP server for configuration,
@@ -21,43 +21,43 @@ Any MCP server used with this backend must implement:
 
 Optional server features that enhance functionality:
 - update_config: Update configuration on server
-- list_config_keys: List available configuration keys  
+- list_config_keys: List available configuration keys
 - save_config: Save configuration to server
 - load_config: Load configuration from server file
 
 Quick Start:
     from backend import ChatBot
-    
+
     bot = ChatBot()
-    
+
     # Connect using server profiles from backend/backend_config.yaml
     await bot.connect_to_server(server_name="production")
     await bot.connect_to_server(server_name="development")
-    
+
     # Connect with direct command (overrides config)
     await bot.connect_to_server(server_command=["python", "/path/to/server.py"])
     await bot.connect_to_server(server_command="node /path/to/server.js")
-    
+
     # Connect to default server from config
     await bot.connect_to_server()
-    
+
     # Process messages (100% configured from server)
     async for response in bot.process_message("Hello!"):
         print(response, end="")
 
 Connection Configuration:
     Server connections are managed via backend/backend_config.yaml:
-    
+
     default_server:
       command: ["python", "server.py"]
       description: "Default MCP server"
-    
+
     servers:
       production:
         command: ["python", "/prod/config_server.py"]
         description: "Production configuration server"
       development:
-        command: ["python", "/dev/config_server.py"] 
+        command: ["python", "/dev/config_server.py"]
         description: "Development configuration server"
       nodejs:
         command: ["node", "/path/to/server.js"]
@@ -125,48 +125,47 @@ from .session import MCPSession
 __all__ = [
     # Main classes
     "ChatBot",
-    "ServerConfig",
-    "MCPSession",
-    "ConversationManager",
-    "ConnectionConfig",
-
     # Exception hierarchy
     "ChatBotBaseException",
-    "ConfigurationError",
-    "ConfigurationValidationError",
-    "ConfigurationMissingError",
-    "ConfigurationLoadError",
-    "ServerIncompatibleError",
-    "ConnectionError",
-    "ServerConnectionError",
-    "WebSocketConnectionError",
-    "STTConnectionError",
-    "SessionError",
-    "SessionNotInitializedError",
-    "SessionInvalidStateError",
-    "ToolExecutionError",
-    "MessageError",
-    "MessageValidationError",
-    "MessageProcessingError",
-    "ConversationError",
-    "WebSocketError",
-    "WebSocketMessageError",
-    "WebSocketClientError",
     "ChatBotUnavailableError",
+    "ConfigurationError",
+    "ConfigurationLoadError",
+    "ConfigurationMissingError",
+    "ConfigurationValidationError",
+    "ConnectionConfig",
+    "ConnectionError",
+    "ConversationError",
+    "ConversationManager",
+    "DeepgramError",
+    "DeepgramSTTError",
+    "ExternalServiceError",
+    "MCPSession",
+    "MessageError",
+    "MessageProcessingError",
+    "MessageValidationError",
+    "OpenAIError",
+    "ResourceCleanupError",
+    "ResourceError",
+    "ResourceExhaustionError",
+    "ResourceNotFoundError",
+    "STTConfigurationError",
+    "STTConnectionError",
     "STTError",
     "STTInitializationError",
-    "STTConfigurationError",
     "STTServiceError",
-    "DeepgramSTTError",
-    "ResourceError",
-    "ResourceNotFoundError",
-    "ResourceCleanupError",
-    "ResourceExhaustionError",
-    "ExternalServiceError",
-    "OpenAIError",
-    "DeepgramError",
-    "wrap_exception",
+    "ServerConfig",
+    "ServerConnectionError",
+    "ServerIncompatibleError",
+    "SessionError",
+    "SessionInvalidStateError",
+    "SessionNotInitializedError",
+    "ToolExecutionError",
+    "WebSocketClientError",
+    "WebSocketConnectionError",
+    "WebSocketError",
+    "WebSocketMessageError",
     "get_exception_for_domain",
+    "wrap_exception",
 ]
 
 __version__ = "1.0.0"

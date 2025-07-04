@@ -34,5 +34,5 @@ echo
 echo "🎯 Next steps:"
 echo "  - Set up pre-commit hooks: uv pip install pre-commit && pre-commit install"
 echo "  - Gradually add type annotations to improve MyPy score"
-echo "  - Increase test coverage towards 70%"
+echo "  - Increase test coverage towards 40%"
 echo "  - Add API latency monitoring" 

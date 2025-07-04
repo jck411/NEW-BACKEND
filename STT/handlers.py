@@ -1,98 +1,109 @@
 """Deepgram STT Event Handlers
-Following 2025 best practices for event handling with proper separation of concerns
+Following 2025 best practices for event handling with proper separation of concerns.
 """
-import asyncio
+
 import logging
 from collections.abc import Callable
+from typing import Any
 
 
 class STTEventHandlers:
-    """Event handlers for Deepgram STT"""
+    """Event handlers for Deepgram STT."""
 
-    def __init__(self, logger: logging.Logger, utterance_callback: Callable[[str], None]):
+    def __init__(
+        self, logger: logging.Logger, utterance_callback: Callable[[str], None]
+    ) -> None:
         self.logger = logger
         self.utterance_callback = utterance_callback
         self.is_final_transcript: list[str] = []
         self.is_streaming_response = False
         self.is_running = False
 
-    async def on_open(self, client, open, **kwargs):
-        """Connection opened callback"""
+    async def on_open(self, _client: Any, _open: Any, **_kwargs: Any) -> None:
+        """Connection opened callback."""
         self.logger.info("🔗 Deepgram connection opened")
 
-    async def on_transcript(self, client, result, **kwargs):
-        """Transcript received callback - main processing logic"""
+    async def on_transcript(self, _client: Any, result: Any, **_kwargs: Any) -> None:
+        """Transcript received callback - main processing logic."""
         try:
-            self.logger.debug(f"🎵 Raw result received: {result}")
+            self.logger.debug("🎵 Raw result received: %s", result)
 
             # Skip processing during KeepAlive mode
             if self.is_streaming_response:
                 return
 
-            transcript = result.channel.alternatives[0].transcript
-            if transcript.strip():
-                if result.is_final:
-                    confidence = getattr(result.channel.alternatives[0], "confidence", "N/A")
-                    self.logger.debug(f"✔️ FINAL: {transcript} (Confidence: {confidence})")
-                    self.is_final_transcript.append(transcript)
+            # Handle unknown object types safely
+            if hasattr(result, "channel") and hasattr(result.channel, "alternatives"):
+                transcript = result.channel.alternatives[0].transcript
+                if transcript.strip():
+                    if hasattr(result, "is_final") and result.is_final:
+                        confidence = getattr(
+                            result.channel.alternatives[0], "confidence", "N/A"
+                        )
+                        self.logger.debug(
+                            "✔️ FINAL: %s (Confidence: %s)", transcript, confidence
+                        )
+                        self.is_final_transcript.append(transcript)
+                    else:
+                        self.logger.debug("⚡ INTERIM: %s", transcript)
                 else:
-                    self.logger.debug(f"⚡ INTERIM: {transcript}")
+                    self.logger.debug("🔇 Empty transcript received")
             else:
-                self.logger.debug("🔇 Empty transcript received")
+                self.logger.debug("🔇 Invalid result structure received")
 
-        except Exception as e:
-            self.logger.error(f"Error processing transcript: {e}")
-            self.logger.debug(f"🐛 Full result object: {result}")
+        except Exception:
+            self.logger.exception("Error processing transcript")
+            self.logger.debug("🐛 Full result object: %s", result)
 
-    async def on_metadata(self, client, metadata, **kwargs):
-        """Metadata received callback"""
-        self.logger.debug(f"📊 Metadata: {metadata}")
+    async def on_metadata(self, _client: Any, metadata: Any, **_kwargs: Any) -> None:
+        """Metadata received callback."""
+        self.logger.debug("📊 Metadata: %s", metadata)
 
-    async def on_speech_started(self, client, speech_started, **kwargs):
-        """Speech started callback"""
-        self.logger.debug(f"🗣️ Speech started: {speech_started}")
+    async def on_speech_started(
+        self, _client: Any, speech_started: Any, **_kwargs: Any
+    ) -> None:
+        """Speech started callback."""
+        self.logger.debug("🗣️ Speech started: %s", speech_started)
 
-    async def on_utterance_end(self, client, utterance_end, **kwargs):
-        """Utterance end callback - triggers final processing"""
+    async def on_utterance_end(
+        self, _client: Any, utterance_end: Any, **_kwargs: Any
+    ) -> None:
+        """Utterance end callback - triggers final processing."""
         try:
-            self.logger.debug(f"🔚 Utterance end: {utterance_end}")
+            self.logger.debug("🔚 Utterance end: %s", utterance_end)
 
             # Skip processing during KeepAlive mode
             if self.is_streaming_response:
                 return
 
-            if self.is_final_transcript:
+            if len(self.is_final_transcript) > 0:
                 complete_utterance = " ".join(self.is_final_transcript)
-                self.logger.info(f"🎯 COMPLETE UTTERANCE: {complete_utterance}")
+                self.logger.info("🎯 COMPLETE UTTERANCE: %s", complete_utterance)
                 self.is_final_transcript = []
 
                 # Trigger callback with complete utterance
-                if self.utterance_callback:
-                    try:
-                        if asyncio.iscoroutinefunction(self.utterance_callback):
-                            await self.utterance_callback(complete_utterance)
-                        else:
-                            self.utterance_callback(complete_utterance)
-                    except Exception as cb_e:
-                        self.logger.error(f"Error in utterance callback: {cb_e}")
+                try:
+                    self.utterance_callback(complete_utterance)
+                except Exception:
+                    self.logger.exception("Error in utterance callback")
 
-        except Exception as e:
-            self.logger.error(f"Error processing utterance end: {e}")
+        except Exception:
+            self.logger.exception("Error processing utterance end")
 
-    async def on_close(self, client, close, **kwargs):
-        """Connection closed callback"""
+    async def on_close(self, _client: Any, _close: Any, **_kwargs: Any) -> None:
+        """Connection closed callback."""
         self.logger.info("❌ Deepgram connection closed")
         self.is_running = False
 
-    async def on_error(self, client, error, **kwargs):
-        """Error callback"""
-        self.logger.error(f"❌ Deepgram error: {error}")
+    async def on_error(self, _client: Any, error: Any, **_kwargs: Any) -> None:
+        """Error callback."""
+        self.logger.error("❌ Deepgram error: %s", error)
         self.is_running = False
 
-    def set_streaming_response(self, is_streaming: bool):
-        """Set streaming response state"""
+    def set_streaming_response(self, is_streaming: bool) -> None:
+        """Set streaming response state."""
         self.is_streaming_response = is_streaming
 
-    def set_running_state(self, is_running: bool):
-        """Set running state"""
+    def set_running_state(self, is_running: bool) -> None:
+        """Set running state."""
         self.is_running = is_running

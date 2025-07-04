@@ -1,17 +1,16 @@
-"""Content extraction utilities for MCP tool results
-"""
+"""Content extraction utilities for MCP tool results."""
 from typing import Any
 
 
 def extract_tool_content(result: Any) -> str:
     """Extract content from MCP tool results.
-    
+
     This utility handles the common pattern of extracting text content
     from tool results across different content types.
-    
+
     Args:
         result: MCP tool result object
-        
+
     Returns:
         str: Extracted content text
     """

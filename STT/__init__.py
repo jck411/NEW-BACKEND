@@ -1,5 +1,4 @@
-"""Speech-to-Text (STT) integration module.
-"""
+"""Speech-to-Text (STT) integration module."""
 
 from .deepgram_stt import DeepgramSTT
 

@@ -135,7 +135,7 @@ class TestGetExceptionForDomain:
 
     def test_get_connection_domain_exception(self) -> None:
         """Test getting exception class for connection domain."""
-        exc_class = get_exception_for_domain("connection")
+        get_exception_for_domain("connection")
         # Should return a connection-related exception class
 
     def test_get_unknown_domain_exception(self) -> None:
