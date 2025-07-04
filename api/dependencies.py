@@ -56,7 +56,7 @@ def validate_message(message: str) -> bool:
 
 
 # Functions for lifecycle management
-def set_chatbot(chatbot: ChatBot) -> None:
+def set_chatbot(chatbot: ChatBot | None) -> None:
     """Set chatbot instance during startup."""
     global _chatbot
     _chatbot = chatbot

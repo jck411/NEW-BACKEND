@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.connection_config import ConnectionConfig
 
@@ -55,10 +55,11 @@ class Settings(BaseSettings):
             # If client config fails to load, continue with defaults
             pass
 
-    class Config:
-        env_file = ".env"
-        env_prefix = "CHATBOT_"
-        extra = "ignore"  # Ignore extra environment variables
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="CHATBOT_",
+        extra="ignore",  # Ignore extra environment variables
+    )
 
 
 # Global settings instance

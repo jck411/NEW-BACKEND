@@ -1,6 +1,6 @@
 """Simple tests for chatbot module."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -38,7 +38,7 @@ class TestChatBot:
         chatbot = ChatBot()
 
         # Mock the MCP session cleanup
-        chatbot.mcp_session.cleanup = MagicMock()
+        chatbot.mcp_session.cleanup = AsyncMock()
 
         await chatbot.cleanup()
 

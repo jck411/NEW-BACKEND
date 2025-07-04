@@ -1,6 +1,6 @@
 """Simple tests for API logging configuration."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from api.config.logging import configure_structured_logging, get_logger
 
@@ -32,7 +32,9 @@ class TestLogging:
         assert callable(configure_structured_logging)
 
     @patch("api.config.logging.structlog")
-    def test_configure_structured_logging_configures_structlog(self, mock_structlog):
+    def test_configure_structured_logging_configures_structlog(
+        self, mock_structlog: MagicMock
+    ) -> None:
         """Test that configure_structured_logging configures structlog."""
         configure_structured_logging()
 

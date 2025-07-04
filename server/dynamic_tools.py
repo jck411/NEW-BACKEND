@@ -73,7 +73,7 @@ class DynamicToolManager:
                     "section": section,
                     "configuration": config_data,
                     "available_keys": available_keys,
-                    "description": self._get_section_description(section),
+                    "description": self.get_section_description(section),
                 }
                 return yaml.dump(result, default_flow_style=False)
             return f"Configuration section '{section}' not found"
@@ -106,7 +106,7 @@ class DynamicToolManager:
                 "current_model": model,
                 "max_tokens": max_tokens,
                 "temperature": temperature,
-                "model_capabilities": self._get_model_info(model),
+                "model_capabilities": self.get_model_info(model),
                 "current_settings": openai_config,
             }
             return yaml.dump(capabilities, default_flow_style=False)
@@ -134,10 +134,10 @@ class DynamicToolManager:
         async def analyze_logging() -> str:
             analysis: dict[str, Any] = {
                 "current_config": logging_config,
-                "performance_impact": self._get_logging_performance_impact(
+                "performance_impact": self.get_logging_performance_impact(
                     current_level
                 ),
-                "recommendations": self._get_logging_recommendations(
+                "recommendations": self.get_logging_recommendations(
                     current_level, enabled=logging_config.get("enabled", True)
                 ),
             }
@@ -171,7 +171,7 @@ class DynamicToolManager:
                 "memory_usage": f"Storing up to {max_history} messages",
                 "prompt_analysis": {
                     "length": len(system_prompt),
-                    "tone": self._analyze_prompt_tone(system_prompt),
+                    "tone": self.analyze_prompt_tone(system_prompt),
                 },
             }
             return yaml.dump(analysis, default_flow_style=False)
@@ -179,7 +179,7 @@ class DynamicToolManager:
         self.dynamic_tools[tool_name] = analyze_conversation
         logger.debug("Created chatbot-specific dynamic tools")
 
-    def _get_section_description(self, section: str) -> str:
+    def get_section_description(self, section: str) -> str:
         """Get description for a configuration section."""
         descriptions = {
             "openai": (
@@ -194,7 +194,7 @@ class DynamicToolManager:
         }
         return descriptions.get(section, f"Configuration settings for {section}")
 
-    def _get_model_info(self, model: str) -> dict[str, Any]:
+    def get_model_info(self, model: str) -> dict[str, Any]:
         """Get information about OpenAI model capabilities."""
         model_info = {
             "gpt-4o-mini": {
@@ -212,7 +212,7 @@ class DynamicToolManager:
             model, {"context_window": "unknown", "best_for": "general use"}
         )
 
-    def _get_logging_performance_impact(self, level: str) -> str:
+    def get_logging_performance_impact(self, level: str) -> str:
         """Analyze performance impact of logging level."""
         impacts = {
             "DEBUG": "High I/O impact, detailed information",
@@ -221,7 +221,7 @@ class DynamicToolManager:
         }
         return impacts.get(level, "Unknown impact")
 
-    def _get_logging_recommendations(self, level: str, *, enabled: bool) -> list[str]:
+    def get_logging_recommendations(self, level: str, *, enabled: bool) -> list[str]:
         """Get logging recommendations."""
         recommendations: list[str] = []
         if level == "DEBUG":
@@ -230,7 +230,7 @@ class DynamicToolManager:
             recommendations.append("Enable logging for troubleshooting")
         return recommendations
 
-    def _analyze_prompt_tone(self, prompt: str) -> str:
+    def analyze_prompt_tone(self, prompt: str) -> str:
         """Analyze the tone of system prompt."""
         prompt_lower = prompt.lower()
         if "sarcastic" in prompt_lower:

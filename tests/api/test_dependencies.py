@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from api.dependencies import (
-    _get_chatbot_internal,
-    _set_chatbot,
+    get_chatbot_internal,
+    set_chatbot,
     get_chatbot,
     get_chatbot_status,
     get_connection_manager,
@@ -22,7 +22,7 @@ class TestGetChatbot:
     def test_get_chatbot_raises_when_not_initialized(self):
         """Test that get_chatbot raises HTTPException when not initialized."""
         # Reset the chatbot to None first
-        _set_chatbot(None)
+        set_chatbot(None)
 
         with pytest.raises(Exception) as exc_info:
             get_chatbot()
@@ -33,14 +33,14 @@ class TestGetChatbot:
         """Test that get_chatbot returns the same instance when initialized."""
         # Set up a mock chatbot
         mock_chatbot = MagicMock(spec=ChatBot)
-        _set_chatbot(mock_chatbot)
+        set_chatbot(mock_chatbot)
 
         chatbot1 = get_chatbot()
         chatbot2 = get_chatbot()
         assert chatbot1 is chatbot2
 
         # Clean up
-        _set_chatbot(None)
+        set_chatbot(None)
 
 
 class TestGetConnectionManager:
@@ -74,7 +74,7 @@ class TestGetChatbotStatus:
     def test_get_chatbot_status_not_initialized(self):
         """Test that get_chatbot_status returns not_initialized when chatbot is None."""
         # Reset the chatbot to None first
-        _set_chatbot(None)
+        set_chatbot(None)
         status = get_chatbot_status()
         assert status["status"] == "not_initialized"
 
@@ -96,7 +96,8 @@ class TestValidateMessage:
 
     def test_validate_message_none(self):
         """Test validating None."""
-        assert validate_message(None) is False
+        # Type ignore because we're testing the function's behavior with None
+        assert validate_message(None) is False  # type: ignore
 
     def test_validate_message_too_long(self):
         """Test validating a message that's too long."""
@@ -117,17 +118,17 @@ class TestInternalChatbotFunctions:
         mock_chatbot = MagicMock(spec=ChatBot)
 
         # Set the chatbot
-        _set_chatbot(mock_chatbot)
+        set_chatbot(mock_chatbot)
 
         # Get the chatbot
-        retrieved_chatbot = _get_chatbot_internal()
+        retrieved_chatbot = get_chatbot_internal()
 
         assert retrieved_chatbot is mock_chatbot
 
     def test_get_chatbot_internal_returns_none_initially(self):
-        """Test that _get_chatbot_internal returns None initially."""
+        """Test that get_chatbot_internal returns None initially."""
         # Reset the internal state
-        _set_chatbot(None)
+        set_chatbot(None)
 
-        result = _get_chatbot_internal()
+        result = get_chatbot_internal()
         assert result is None

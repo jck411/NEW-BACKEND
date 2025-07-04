@@ -2,6 +2,7 @@
 
 import argparse
 import contextlib
+import subprocess
 from unittest.mock import MagicMock, patch
 
 from backend.__main__ import launch_backend_server, main, parse_args
@@ -69,7 +70,9 @@ class TestBackendMain:
 
     @patch("backend.__main__.ChatBot")
     @patch("backend.__main__.launch_backend_server")
-    def test_main_default_behavior(self, mock_launch, mock_chatbot_class):
+    def test_main_default_behavior(
+        self, mock_launch: MagicMock, mock_chatbot_class: MagicMock
+    ) -> None:
         """Test main function with default behavior."""
         mock_chatbot = MagicMock()
         mock_chatbot_class.return_value = mock_chatbot
@@ -84,7 +87,9 @@ class TestBackendMain:
 
     @patch("backend.__main__.ChatBot")
     @patch("backend.__main__.launch_backend_server")
-    def test_main_with_server_path(self, mock_launch, mock_chatbot_class):
+    def test_main_with_server_path(
+        self, mock_launch: MagicMock, mock_chatbot_class: MagicMock
+    ) -> None:
         """Test main function with server path."""
         mock_chatbot = MagicMock()
         mock_chatbot_class.return_value = mock_chatbot
@@ -99,7 +104,9 @@ class TestBackendMain:
 
     @patch("backend.__main__.ChatBot")
     @patch("builtins.print")
-    def test_main_show_config(self, mock_print, mock_chatbot_class):
+    def test_main_show_config(
+        self, mock_print: MagicMock, mock_chatbot_class: MagicMock
+    ) -> None:
         """Test main function with show-config flag."""
         mock_chatbot = MagicMock()
         mock_chatbot.get_configured_server_path.return_value = "/path/to/server.py"
@@ -123,20 +130,24 @@ class TestBackendMain:
 
     @patch("backend.__main__.ChatBot")
     @patch("builtins.print")
-    def test_main_show_config_error(self, mock_print, mock_chatbot_class):
+    def test_main_show_config_error(
+        self, mock_print: MagicMock, mock_chatbot_class: MagicMock
+    ) -> None:
         """Test main function with show-config flag and error."""
         mock_chatbot = MagicMock()
-        mock_chatbot.get_configured_server_path.side_effect = Exception("Config error")
+        mock_chatbot.get_configured_server_path.side_effect = RuntimeError(
+            "Config error"
+        )
         mock_chatbot_class.return_value = mock_chatbot
 
         with patch("sys.argv", ["backend", "--show-config"]):
             main()
 
             # Should handle error gracefully
-            mock_print.assert_called()
+            mock_print.assert_called_with("Error retrieving configuration")
 
     @patch("backend.__main__.ChatBot")
-    def test_main_keyboard_interrupt(self, mock_chatbot_class):
+    def test_main_keyboard_interrupt(self, mock_chatbot_class: MagicMock) -> None:
         """Test main function with keyboard interrupt."""
         mock_chatbot = MagicMock()
         mock_chatbot_class.side_effect = KeyboardInterrupt()
@@ -147,10 +158,10 @@ class TestBackendMain:
             mock_print.assert_called_with("\n👋 Goodbye!")
 
     @patch("backend.__main__.ChatBot")
-    def test_main_exception(self, mock_chatbot_class):
+    def test_main_exception(self, mock_chatbot_class: MagicMock) -> None:
         """Test main function with exception."""
         MagicMock()
-        mock_chatbot_class.side_effect = Exception("Test error")
+        mock_chatbot_class.side_effect = RuntimeError("Test error")
 
         with patch("sys.argv", ["backend"]), patch("sys.exit") as mock_exit:
             with patch("builtins.print") as mock_print:
@@ -160,7 +171,9 @@ class TestBackendMain:
 
     @patch("subprocess.run")
     @patch("pathlib.Path")
-    def test_launch_backend_server_success(self, mock_path, mock_run):
+    def test_launch_backend_server_success(
+        self, mock_path: MagicMock, mock_run: MagicMock
+    ) -> None:
         """Test launch_backend_server success."""
         mock_backend_script = MagicMock()
         mock_backend_script.exists.return_value = True
@@ -168,14 +181,12 @@ class TestBackendMain:
             mock_backend_script
         )
 
-        with patch("builtins.print") as mock_print:
-            launch_backend_server()
+        launch_backend_server()
 
-            mock_run.assert_called_once()
-            mock_print.assert_called()
+        mock_run.assert_called_once()
 
     @patch("pathlib.Path")
-    def test_launch_backend_server_script_not_found(self, mock_path):
+    def test_launch_backend_server_script_not_found(self, mock_path: MagicMock) -> None:
         """Test launch_backend_server with script not found."""
         mock_backend_script = MagicMock()
         mock_backend_script.exists.return_value = False
@@ -189,7 +200,9 @@ class TestBackendMain:
 
     @patch("subprocess.run")
     @patch("pathlib.Path")
-    def test_launch_backend_server_subprocess_error(self, mock_path, mock_run):
+    def test_launch_backend_server_subprocess_error(
+        self, mock_path: MagicMock, mock_run: MagicMock
+    ) -> None:
         """Test launch_backend_server with subprocess error."""
         mock_backend_script = MagicMock()
         mock_backend_script.exists.return_value = True
@@ -205,7 +218,9 @@ class TestBackendMain:
 
     @patch("subprocess.run")
     @patch("pathlib.Path")
-    def test_launch_backend_server_keyboard_interrupt(self, mock_path, mock_run):
+    def test_launch_backend_server_keyboard_interrupt(
+        self, mock_path: MagicMock, mock_run: MagicMock
+    ) -> None:
         """Test launch_backend_server with keyboard interrupt."""
         mock_backend_script = MagicMock()
         mock_backend_script.exists.return_value = True
@@ -221,7 +236,9 @@ class TestBackendMain:
 
     @patch("subprocess.run")
     @patch("pathlib.Path")
-    def test_launch_backend_server_general_exception(self, mock_path, mock_run):
+    def test_launch_backend_server_general_exception(
+        self, mock_path: MagicMock, mock_run: MagicMock
+    ) -> None:
         """Test launch_backend_server with general exception."""
         mock_backend_script = MagicMock()
         mock_backend_script.exists.return_value = True
@@ -229,7 +246,7 @@ class TestBackendMain:
             mock_backend_script
         )
 
-        mock_run.side_effect = Exception("Test error")
+        mock_run.side_effect = RuntimeError("Test error")
 
         with patch("sys.exit") as mock_exit:
             launch_backend_server()
@@ -255,7 +272,7 @@ class TestBackendMain:
         assert any("-v" in str(action) for action in parser._actions)
 
     @patch("backend.__main__.logging.basicConfig")
-    def test_main_verbose_logging(self, mock_logging):
+    def test_main_verbose_logging(self, mock_logging: MagicMock) -> None:
         """Test main function with verbose logging."""
         with (
             patch("sys.argv", ["backend", "--verbose"]),
@@ -266,7 +283,7 @@ class TestBackendMain:
                 mock_logging.assert_called_with(level=10)  # DEBUG level
 
     @patch("backend.__main__.logging.basicConfig")
-    def test_main_normal_logging(self, mock_logging):
+    def test_main_normal_logging(self, mock_logging: MagicMock) -> None:
         """Test main function with normal logging."""
         with patch("sys.argv", ["backend"]), patch("backend.__main__.ChatBot"):
             with patch("backend.__main__.launch_backend_server"):

@@ -1,8 +1,8 @@
 """Pytest configuration and shared fixtures."""
 
 import asyncio
-from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
+from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ from api.main import app
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> AsyncGenerator[asyncio.AbstractEventLoop]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
@@ -53,5 +53,5 @@ def sample_websocket_message():
     return {
         "type": "text",
         "message": "Hello, how can you help me?",
-        "message_id": "test-msg-123"
+        "message_id": "test-msg-123",
     }

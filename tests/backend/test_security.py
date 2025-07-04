@@ -210,7 +210,7 @@ class TestConversationManagerSecurity:
                 ConversationManager(mock_session)
 
     @patch("backend.conversation.AsyncOpenAI")
-    def test_openai_client_uses_explicit_key(self, mock_openai):
+    def test_openai_client_uses_explicit_key(self, mock_openai: MagicMock) -> None:
         """Test that ConversationManager uses explicit API key."""
         from backend.conversation import ConversationManager
         from backend.session import MCPSession

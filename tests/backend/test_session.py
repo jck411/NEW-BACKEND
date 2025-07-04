@@ -78,8 +78,10 @@ class TestMCPSession:
     @patch("backend.session.stdio_client")
     @patch("backend.session.ClientSession")
     async def test_connect_with_string_command(
-        self, mock_client_session, mock_stdio_client
-    ):
+        self,
+        mock_client_session: MagicMock,
+        mock_stdio_client: MagicMock,
+    ) -> None:
         """Test connecting with string command."""
         session = MCPSession()
 
@@ -109,8 +111,10 @@ class TestMCPSession:
     @patch("backend.session.stdio_client")
     @patch("backend.session.ClientSession")
     async def test_connect_with_list_command(
-        self, mock_client_session, mock_stdio_client
-    ):
+        self,
+        mock_client_session: MagicMock,
+        mock_stdio_client: MagicMock,
+    ) -> None:
         """Test connecting with list command."""
         session = MCPSession()
 

@@ -1,6 +1,5 @@
 """Simple tests for API lifecycle management."""
 
-
 from api.lifecycle import lifespan
 
 
@@ -45,8 +44,8 @@ class TestLifespan:
 
     def test_lifespan_with_none_app(self):
         """Test that lifespan handles None app gracefully."""
-        # Should not raise an exception immediately
-        result = lifespan(None)
+        # Type ignore because we're testing the function's behavior with None
+        result = lifespan(None)  # type: ignore
         assert result is not None
 
     def test_lifespan_context_manager_protocol(self):
