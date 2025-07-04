@@ -168,10 +168,32 @@ def log_function_call(func_name: str) -> Callable[..., Any]:
                     success=True,
                 )
 
+            except (RuntimeError, ValueError, AttributeError) as e:
+                elapsed = round((time.time() - start_time) * 1000, 2)
+                logger.warning(
+                    "Function failed with expected error",
+                    event="function_error",
+                    function=func_name,
+                    elapsed_ms=elapsed,
+                    error=str(e),
+                    exception_type=type(e).__name__,
+                )
+                raise
+            except (OSError, ConnectionError) as e:
+                elapsed = round((time.time() - start_time) * 1000, 2)
+                logger.error(
+                    "Function failed with network error",
+                    event="function_error",
+                    function=func_name,
+                    elapsed_ms=elapsed,
+                    error=str(e),
+                    exception_type=type(e).__name__,
+                )
+                raise
             except Exception as e:
                 elapsed = round((time.time() - start_time) * 1000, 2)
                 logger.exception(
-                    "Function failed",
+                    "Function failed with unexpected error",
                     event="function_error",
                     function=func_name,
                     elapsed_ms=elapsed,
@@ -207,10 +229,32 @@ def log_function_call(func_name: str) -> Callable[..., Any]:
                     success=True,
                 )
 
+            except (RuntimeError, ValueError, AttributeError) as e:
+                elapsed = round((time.time() - start_time) * 1000, 2)
+                logger.warning(
+                    "Function failed with expected error",
+                    event="function_error",
+                    function=func_name,
+                    elapsed_ms=elapsed,
+                    error=str(e),
+                    exception_type=type(e).__name__,
+                )
+                raise
+            except (OSError, ConnectionError) as e:
+                elapsed = round((time.time() - start_time) * 1000, 2)
+                logger.error(
+                    "Function failed with network error",
+                    event="function_error",
+                    function=func_name,
+                    elapsed_ms=elapsed,
+                    error=str(e),
+                    exception_type=type(e).__name__,
+                )
+                raise
             except Exception as e:
                 elapsed = round((time.time() - start_time) * 1000, 2)
                 logger.exception(
-                    "Function failed",
+                    "Function failed with unexpected error",
                     event="function_error",
                     function=func_name,
                     elapsed_ms=elapsed,

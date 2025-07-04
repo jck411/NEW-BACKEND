@@ -56,10 +56,18 @@ async def _async_reload_config() -> None:
                         _dynamic_tool_manager.config = _config
                         await _dynamic_tool_manager.transform_tools_based_on_config()
                         logger.info("Dynamic tools auto-refreshed after config change")
-                    except Exception as e:
+                    except (RuntimeError, ValueError, AttributeError) as e:
                         logger.warning("Failed to auto-refresh dynamic tools: %s", e)
+                    except Exception as e:
+                        logger.exception(
+                            "Unexpected error auto-refreshing dynamic tools: %s", e
+                        )
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        logger.error("File system error auto-reloading configuration: %s", e)
+    except yaml.YAMLError as e:
+        logger.error("YAML parsing error auto-reloading configuration: %s", e)
     except Exception as e:
-        logger.exception("Error auto-reloading configuration: %s", e)
+        logger.exception("Unexpected error auto-reloading configuration: %s", e)
 
 
 async def _config_watcher() -> None:
@@ -70,8 +78,13 @@ async def _config_watcher() -> None:
                 if Path(path) == _config_file_path:
                     logger.debug("Config file %s: %s", change_type.name.lower(), path)
                     await _async_reload_config()
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        logger.error("File system error in config watcher: %s", e)
+    except asyncio.CancelledError:
+        logger.info("Config watcher cancelled")
+        raise
     except Exception as e:
-        logger.exception("Config watcher error: %s", e)
+        logger.exception("Unexpected config watcher error: %s", e)
 
 
 def _start_config_watcher() -> asyncio.Task[None]:
@@ -157,8 +170,12 @@ async def update_config(section: str, key: str, value: str) -> str:
         async with aiofiles.open(_config_file_path, "w") as f:
             await f.write(yaml.dump(_config, default_flow_style=False, indent=2))
         save_status = f" (saved to server config, version {_config_version})"
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        save_status = f" (warning: file system error - {e!s})"
+    except yaml.YAMLError as e:
+        save_status = f" (warning: YAML serialization error - {e!s})"
     except Exception as e:
-        save_status = f" (warning: could not save to file - {e!s})"
+        save_status = f" (warning: unexpected error saving - {e!s})"
 
     return (
         f"Updated {section}.{key} from '{old_value}' to '{parsed_value}'{save_status}"
@@ -178,8 +195,12 @@ async def save_config(filepath: str = "dynamic_backend_config.yaml") -> str:
         async with aiofiles.open(path, "w") as f:
             await f.write(yaml.dump(_config, default_flow_style=False, indent=2))
         return f"Configuration saved to {path}"
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        return f"File system error saving configuration: {e}"
+    except yaml.YAMLError as e:
+        return f"YAML serialization error saving configuration: {e}"
     except Exception as e:
-        return f"Error saving configuration: {e}"
+        return f"Unexpected error saving configuration: {e}"
 
 
 @mcp.tool()
@@ -204,8 +225,12 @@ async def load_config(filepath: str = "dynamic_backend_config.yaml") -> str:
                 return f"Configuration loaded from {path} (version {_config_version})"
             return f"Configuration file {path} is empty or invalid"
         return f"Configuration file {path} not found"
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        return f"File system error loading configuration: {e}"
+    except yaml.YAMLError as e:
+        return f"YAML parsing error loading configuration: {e}"
     except Exception as e:
-        return f"Error loading configuration: {e}"
+        return f"Unexpected error loading configuration: {e}"
 
 
 @mcp.tool()
@@ -224,8 +249,14 @@ async def reset_config() -> str:
                 f"Configuration reset to default values from default_backend_config.yaml "
                 f"(version {_config_version})"
             )
+        except (OSError, FileNotFoundError, PermissionError) as e:
+            return (
+                f"Configuration reset to defaults but file system error saving: {e!s}"
+            )
+        except yaml.YAMLError as e:
+            return f"Configuration reset to defaults but YAML error saving: {e!s}"
         except Exception as e:
-            return f"Configuration reset to defaults but could not save: {e!s}"
+            return f"Configuration reset to defaults but unexpected error saving: {e!s}"
     else:
         return "Error: Default configuration not available"
 
@@ -282,8 +313,12 @@ async def calculate(operation: str, a: float, b: float) -> str:
         if operation == "divide":
             return "Error: Division by zero" if b == 0 else str(a / b)
         return str(ops.get(operation, f"Unknown operation: {operation}"))
+    except (ValueError, TypeError) as e:
+        return f"Input validation error: {e}"
+    except (OverflowError, ArithmeticError) as e:
+        return f"Arithmetic error: {e}"
     except Exception as e:
-        return f"Error: {e}"
+        return f"Unexpected calculation error: {e}"
 
 
 # 🔥 REMOVED: refresh_dynamic_tools - now automatic via event-driven config updates
@@ -302,8 +337,12 @@ async def _async_load_default_config() -> bool:
                 _default_config = loaded
                 logger.info("Loaded default config from %s", default_file)
                 return True
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        logger.warning("File system error loading defaults: %s", e)
+    except yaml.YAMLError as e:
+        logger.warning("YAML parsing error loading defaults: %s", e)
     except Exception as e:
-        logger.warning("Warning loading defaults: %s", e)
+        logger.exception("Unexpected error loading defaults: %s", e)
     return False
 
 
@@ -320,8 +359,12 @@ def _load_default_config() -> bool:
                 _default_config = loaded
                 logger.info("Loaded default config from %s", default_file)
                 return True
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        logger.warning("File system error loading defaults: %s", e)
+    except yaml.YAMLError as e:
+        logger.warning("YAML parsing error loading defaults: %s", e)
     except Exception as e:
-        logger.warning("Warning loading defaults: %s", e)
+        logger.exception("Unexpected error loading defaults: %s", e)
     return False
 
 
@@ -350,8 +393,16 @@ if __name__ == "__main__":
             logger.info("No config file; using defaults")
             _config = _default_config.copy()
             _config_version = 1
+    except (OSError, FileNotFoundError, PermissionError) as e:
+        logger.error("File system error loading config: %s; using defaults", e)
+        _config = _default_config.copy()
+        _config_version = 1
+    except yaml.YAMLError as e:
+        logger.error("YAML parsing error loading config: %s; using defaults", e)
+        _config = _default_config.copy()
+        _config_version = 1
     except Exception as e:
-        logger.exception("Error loading config: %s; using defaults", e)
+        logger.exception("Unexpected error loading config: %s; using defaults", e)
         _config = _default_config.copy()
         _config_version = 1
 

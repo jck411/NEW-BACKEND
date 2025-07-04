@@ -6,8 +6,13 @@ import json
 import uuid
 
 from fastapi import WebSocket
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from api.config.logging import get_logger
+from backend.exceptions import (
+    WebSocketClientError,
+    wrap_exception,
+)
 
 
 class ConnectionManager:
@@ -47,13 +52,38 @@ class ConnectionManager:
             websocket = self.active_connections[client_id]
             try:
                 await websocket.send_text(message)
-            except Exception as e:
-                self.logger.exception(
-                    "Failed to send WebSocket message",
+            except (ConnectionClosed, WebSocketException) as e:
+                self.logger.info(
+                    "WebSocket connection closed during send",
+                    client_id=client_id,
+                    error=str(e),
+                )
+                # Remove broken connection
+                self.disconnect(client_id)
+            except (OSError, ConnectionError) as e:
+                self.logger.error(
+                    "Network error sending to WebSocket",
                     client_id=client_id,
                     error=str(e),
                     exception_type=type(e).__name__,
                 )
+                # Remove broken connection
+                self.disconnect(client_id)
+            except Exception as e:
+                self.logger.exception(
+                    "Unexpected error sending WebSocket message",
+                    client_id=client_id,
+                    error=str(e),
+                    exception_type=type(e).__name__,
+                )
+                wrapped_error = wrap_exception(
+                    e,
+                    WebSocketClientError,
+                    "Failed to send message to client",
+                    error_code="SEND_ERROR",
+                    context={"client_id": client_id},
+                )
+                self.logger.error("Send error details: %s", wrapped_error.to_dict())
                 # Remove broken connection
                 self.disconnect(client_id)
 
@@ -64,8 +94,30 @@ class ConnectionManager:
         for client_id, websocket in self.active_connections.items():
             try:
                 await websocket.send_text(message)
+            except (ConnectionClosed, WebSocketException) as e:
+                self.logger.info(
+                    "WebSocket connection closed during broadcast to %s: %s",
+                    client_id,
+                    e,
+                )
+                disconnected_clients.append(client_id)
+            except (OSError, ConnectionError) as e:
+                self.logger.error("Network error broadcasting to %s: %s", client_id, e)
+                disconnected_clients.append(client_id)
             except Exception as e:
-                self.logger.exception("Failed to broadcast to %s: %s", client_id, e)
+                self.logger.exception(
+                    "Unexpected error broadcasting to %s: %s", client_id, e
+                )
+                wrapped_error = wrap_exception(
+                    e,
+                    WebSocketClientError,
+                    "Failed to broadcast message",
+                    error_code="BROADCAST_ERROR",
+                    context={"client_id": client_id},
+                )
+                self.logger.error(
+                    "Broadcast error details: %s", wrapped_error.to_dict()
+                )
                 disconnected_clients.append(client_id)
 
         # Clean up broken connections

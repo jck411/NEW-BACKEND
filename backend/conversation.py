@@ -337,10 +337,40 @@ class ConversationManager:
                         "content": content_text,
                     }
                 )
-            except Exception as e:
-                error_message = (
-                    f"Error executing tool {tool_call['function']['name']}: {e!s}"
+            except json.JSONDecodeError as e:
+                error_message = f"Invalid JSON arguments for tool {tool_call['function']['name']}: {e!s}"
+                self.logger.error(error_message)
+                self.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": error_message,
+                    }
                 )
+            except (ConnectionError, OSError) as e:
+                error_message = f"Network error executing tool {tool_call['function']['name']}: {e!s}"
+                self.logger.error(error_message)
+                self.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": error_message,
+                    }
+                )
+            except (RuntimeError, ValueError) as e:
+                error_message = (
+                    f"Tool execution error for {tool_call['function']['name']}: {e!s}"
+                )
+                self.logger.warning(error_message)
+                self.conversation_history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": error_message,
+                    }
+                )
+            except Exception as e:
+                error_message = f"Unexpected error executing tool {tool_call['function']['name']}: {e!s}"
                 self.logger.exception(error_message)
                 self.conversation_history.append(
                     {

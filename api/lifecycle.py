@@ -24,8 +24,14 @@ async def lifespan(app: FastAPI):
         await chatbot.connect_to_server()
         set_chatbot(chatbot)
         logger.info("ChatBot initialized successfully")
-    except Exception:
-        logger.exception("Failed to initialize ChatBot")
+    except (RuntimeError, ValueError, AttributeError) as e:
+        logger.error("ChatBot initialization error: %s", e)
+        raise
+    except (OSError, ConnectionError) as e:
+        logger.error("Network error initializing ChatBot: %s", e)
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error initializing ChatBot: %s", e)
         raise
 
     yield
